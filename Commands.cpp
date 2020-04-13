@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <sys/types.h>
 
 using namespace std;
 
@@ -82,9 +83,9 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() {
+SmallShell::SmallShell() :prompt("smash>") {
 // TODO: add your implementation
 }
 
@@ -92,16 +93,22 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
+const string SmallShell::getPrompt() const{
+  return prompt;
+}
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-/*
   string cmd_s = string(cmd_line);
-  if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
+  if (cmd_s.find("chprompt") == 0) {
+    return new chprompt((*this),cmd_line);
   }
+  else if (cmd_s.find("showpid") == 0){
+      return new ShowPidCommand(cmd_line);
+      }
+  /*
   else if ...
   .....
   else {
@@ -114,7 +121,31 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
   // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
+  Command* cmd = CreateCommand(cmd_line);
+  cmd->execute();
   // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+Command::Command(const char *cmd_line) {
+    this->cmd_line=cmd_line;
+}
+
+
+Command::~Command(){}
+BuiltInCommand::~BuiltInCommand(){}
+BuiltInCommand::BuiltInCommand(const char *cmd_line):Command(cmd_line){}
+chprompt::chprompt(SmallShell &s, const char *cmd_line):BuiltInCommand(cmd_line), smash(s) {
+    char* args[20];
+    int num = _parseCommandLine(cmd_line, args);
+    if (num==1) {
+        this->prompt ="smash>";
+    }
+    else {
+        this->prompt = string(args[1])+=">";
+    }
+}
+
+chprompt::~chprompt(){};
+void ShowPidCommand::execute(){
+        cout<<"smash pid is " << getpid() <<endl;
 }

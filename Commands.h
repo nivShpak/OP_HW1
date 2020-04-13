@@ -7,9 +7,16 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
+using std::string;
+using std::cout;
+using std::endl;
+
+
+
 class Command {
 // TODO: Add your data members
- public:
+    string cmd_line;
+public:
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
@@ -18,10 +25,12 @@ class Command {
   // TODO: Add your extra methods if needed
 };
 
+
 class BuiltInCommand : public Command {
  public:
   BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+  virtual ~BuiltInCommand();
+  virtual void execute() =0;
 };
 
 class ExternalCommand : public Command {
@@ -65,8 +74,8 @@ class GetCurrDirCommand : public BuiltInCommand {
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
-  virtual ~ShowPidCommand() {}
+  ShowPidCommand(const char* cmd_line):BuiltInCommand(cmd_line){};
+  virtual ~ShowPidCommand() {};
   void execute() override;
 };
 
@@ -101,7 +110,7 @@ class HistoryCommand : public BuiltInCommand {
 
 class JobsList {
  public:
-  class JobEntry {
+   class JobEntry {
    // TODO: Add your data members
   };
  // TODO: Add your data members
@@ -160,14 +169,27 @@ class CopyCommand : public BuiltInCommand {
   void execute() override;
 };
 
-// TODO: add more classes if needed 
+// TODO: add more classes if needed
 // maybe chprompt , timeout ?
+
+
+
+
+
+
+
+
 
 class SmallShell {
  private:
   // TODO: Add your data members
+  string prompt;
   SmallShell();
  public:
+  const string getPrompt() const;
+  void setPrompt(string new_prompt) {
+    prompt = new_prompt;
+  }
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
@@ -181,5 +203,20 @@ class SmallShell {
   void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
 };
+
+
+
+
+class chprompt : public BuiltInCommand {
+    SmallShell& smash;
+    string prompt;
+public:
+    chprompt( SmallShell& s, const char* new_prompt = "smash>");
+    void execute() override{
+        smash.setPrompt(this->prompt);
+    } ;
+    ~chprompt();
+};
+
 
 #endif //SMASH_COMMAND_H_
