@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/smash.cpp.dir/Commands.cpp.o  -o smash.cpp 

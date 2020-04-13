@@ -1,0 +1,32 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/student/Desktop/OP_HW1/Commands.cpp
+unistd.h
+-
+string.h
+-
+iostream
+-
+vector
+-
+sstream
+-
+sys/wait.h
+-
+iomanip
+-
+Commands.h
+/home/student/Desktop/OP_HW1/Commands.h
+sys/types.h
+-
+
+/home/student/Desktop/OP_HW1/Commands.h
+vector
+-
+

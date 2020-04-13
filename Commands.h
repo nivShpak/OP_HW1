@@ -6,7 +6,7 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
-#include "string.h"
+
 class SmallShell;
 class Command;
 class JobsList;
@@ -24,14 +24,19 @@ public:
     //virtual void prepare();
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
+
+
 };
 
+
 class BuiltInCommand : public Command {
+
 public:
 
     BuiltInCommand(const char *cmdLine);
 
     virtual ~BuiltInCommand() {}
+
 };
 
 class ExternalCommand : public Command {
@@ -79,9 +84,9 @@ public:
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char* cmd_line);
-    virtual ~ShowPidCommand() {}
-    void execute() override;
+  ShowPidCommand(const char* cmd_line):BuiltInCommand(cmd_line){};
+  virtual ~ShowPidCommand() {};
+  void execute() override;
 };
 
 
@@ -116,6 +121,7 @@ public:
 };
 
 class JobsList {
+
 public:
     class JobEntry {
         // TODO: Add your data members
@@ -133,6 +139,7 @@ public:
     JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify exisitng ones as needed
+
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -185,10 +192,18 @@ public:
     void execute() override;
 };
 
+
+
+
+
+
+
+
+
 class SmallShell {
 private:
     // TODO: Add your data members
-
+    string prompt;
     char* plastPwd;
     SmallShell();
 public:
@@ -205,8 +220,22 @@ public:
     void executeCommand(const char* cmd_line);
     // TODO: add extra methods as needed
 
-
     char* GetLastPwd();
 };
+
+
+
+
+class chprompt : public BuiltInCommand {
+    SmallShell& smash;
+    string prompt;
+public:
+    chprompt( SmallShell& s, const char* new_prompt = "smash>");
+    void execute() override{
+        smash.setPrompt(this->prompt);
+    } ;
+    ~chprompt();
+};
+
 
 #endif //SMASH_COMMAND_H_

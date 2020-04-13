@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <sys/types.h>
 
 using namespace std;
 
@@ -82,9 +83,9 @@ void _removeBackgroundSign(char* cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
-///SmallShell start
-SmallShell::SmallShell(){
+// TODO: Add your implementation for classes in Commands.h
+
+SmallShell::SmallShell() :prompt("smash>") {
 // TODO: add your implementation
     plastPwd= ""; ///check that
 
@@ -94,10 +95,14 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
+const string SmallShell::getPrompt() const{
+  return prompt;
+}
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
+
     // For example:
 
     string cmd_s = string(cmd_line);
@@ -106,14 +111,16 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new GetCurrDirCommand(cmd_line);
     }
     else if (cmd_s.find("cd") == 0){
-
         cmd_line=cmd_line;
         char** platPwdp=&this->plastPwd;
         return new ChangeDirCommand(cmd_line,platPwdp);
     }
-    // else {
-    // return new ExternalCommand(cmd_line);
-    //}
+    else if (cmd_s.find("chprompt") == 0) {
+      return new chprompt((*this),cmd_line);
+    }
+    else if (cmd_s.find("showpid") == 0){
+       return new ShowPidCommand(cmd_line);
+    }
 
     return nullptr;
 }
@@ -182,4 +189,20 @@ void ChangeDirCommand::execute() {
 
     chdir(args[1]);
 }
+chprompt::chprompt(SmallShell &s, const char *cmd_line):BuiltInCommand(cmd_line), smash(s) {
+    char* args[20];
+    int num = _parseCommandLine(cmd_line, args);
+    if (num==1) {
+        this->prompt ="smash>";
+    }
+    else {
+        this->prompt = string(args[1])+=">";
+    }
+}
+
+chprompt::~chprompt(){};
+void ShowPidCommand::execute(){
+        cout<<"smash pid is " << getpid() <<endl;
+}
 ///CD end/home/student/Desktop/OP_HW1Git/CMakeLists.txt
+
