@@ -67,7 +67,9 @@ class ShowPidCommand : public BuiltInCommand {
  public:
   ShowPidCommand(const char* cmd_line);
   virtual ~ShowPidCommand() {}
-  void execute() override;
+  void execute() override {
+    cout<<"smash pid is " + getpid()<<endl;
+  };
 };
 
 class JobsList;
@@ -101,7 +103,7 @@ class HistoryCommand : public BuiltInCommand {
 
 class JobsList {
  public:
-  class JobEntry {
+   class JobEntry {
    // TODO: Add your data members
   };
  // TODO: Add your data members
@@ -160,14 +162,37 @@ class CopyCommand : public BuiltInCommand {
   void execute() override;
 };
 
-// TODO: add more classes if needed 
+// TODO: add more classes if needed
 // maybe chprompt , timeout ?
+
+
+class chprompt : public BuiltInCommand {
+  SmallShell& smash;
+  string prompt;
+public:
+  chprompt( SmallShell& s, const char* new_prompt = "smash>"):smash(s),prompt(new_prompt){};
+  void execute() {
+    smash.setPrompt(prompt);
+  } override;
+}
+
+
+
+
+
+
+
 
 class SmallShell {
  private:
   // TODO: Add your data members
+  string prompt;
   SmallShell();
  public:
+  const string getPrompt() const;
+  void setPrompt(string new_prompt) {
+    prompt = new_prompt;
+  }
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
@@ -181,5 +206,6 @@ class SmallShell {
   void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
 };
+
 
 #endif //SMASH_COMMAND_H_

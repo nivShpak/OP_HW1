@@ -82,9 +82,9 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() {
+SmallShell::SmallShell() :headline("smash>") {
 // TODO: add your implementation
 }
 
@@ -92,16 +92,20 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
+const string SmallShell::getHeadline() const{
+  return headline;
+}
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
 /*
-  string cmd_s = string(cmd_line);
+  string cmd_s = string(cmd_line);*/
   if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
+    return new chprompt(this,cmd_line+8);
   }
+  /*
   else if ...
   .....
   else {
@@ -114,7 +118,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
   // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
+  Command* cmd = CreateCommand(cmd_line);
+  cmd->execute();
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
