@@ -7,9 +7,16 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
+using std::string;
+using std::cout;
+using std::endl;
+
+
+
 class Command {
 // TODO: Add your data members
- public:
+    string cmd_line;
+public:
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
@@ -18,10 +25,12 @@ class Command {
   // TODO: Add your extra methods if needed
 };
 
+
 class BuiltInCommand : public Command {
  public:
   BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+  virtual ~BuiltInCommand();
+  virtual void execute() =0;
 };
 
 class ExternalCommand : public Command {
@@ -65,11 +74,9 @@ class GetCurrDirCommand : public BuiltInCommand {
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
-  virtual ~ShowPidCommand() {}
-  void execute() override {
-    cout<<"smash pid is " + getpid()<<endl;
-  };
+  ShowPidCommand(const char* cmd_line):BuiltInCommand(cmd_line){};
+  virtual ~ShowPidCommand() {};
+  void execute() override;
 };
 
 class JobsList;
@@ -166,16 +173,6 @@ class CopyCommand : public BuiltInCommand {
 // maybe chprompt , timeout ?
 
 
-class chprompt : public BuiltInCommand {
-  SmallShell& smash;
-  string prompt;
-public:
-  chprompt( SmallShell& s, const char* new_prompt = "smash>"):smash(s),prompt(new_prompt){};
-  void execute() {
-    smash.setPrompt(prompt);
-  } override;
-}
-
 
 
 
@@ -205,6 +202,20 @@ class SmallShell {
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
+};
+
+
+
+
+class chprompt : public BuiltInCommand {
+    SmallShell& smash;
+    string prompt;
+public:
+    chprompt( SmallShell& s, const char* new_prompt = "smash>");
+    void execute() override{
+        smash.setPrompt(this->prompt);
+    } ;
+    ~chprompt();
 };
 
 
