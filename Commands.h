@@ -6,6 +6,7 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
+using namespace std;
 
 class SmallShell;
 class Command;
@@ -192,14 +193,6 @@ public:
     void execute() override;
 };
 
-
-
-
-
-
-
-
-
 class SmallShell {
 private:
     // TODO: Add your data members
@@ -207,6 +200,8 @@ private:
     char* plastPwd;
     SmallShell();
 public:
+    const string getPrompt()const;
+    void setPrompt(string new_prompt);
     Command *CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator

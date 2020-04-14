@@ -87,7 +87,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell() :prompt("smash>") {
 // TODO: add your implementation
-    plastPwd= ""; ///check that
+    plastPwd= (char*)""; ///check that
 
 }
 
@@ -129,10 +129,15 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     //for example:
     Command* cmd = CreateCommand(cmd_line);
+    if (cmd==NULL)
+        return; //todo maybe error
     cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+void SmallShell::setPrompt(string new_prompt) {
+    this->prompt=new_prompt;
+}
 
 
 char *SmallShell::GetLastPwd() {
