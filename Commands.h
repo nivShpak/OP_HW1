@@ -2,9 +2,17 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include "time.h"
+#include <algorithm>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
+enum State
+{
+    FinishState,
+    BgState,
+    StoppedState
+};
 
 using namespace std;
 
@@ -16,15 +24,17 @@ class Command {
 // TODO: Add your data members
 protected:
     std::string cmd_line;
-    char* args[COMMAND_MAX_ARGS];
-    SmallShell* smash;
+    char* args[COMMAND_MAX_ARGS+1];
+    SmallShell* cmd_smash;
 public:
     Command(const char* cmd_line);
+    Command(const char* cmd_line,SmallShell& smash);
     virtual ~Command();
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
+    string GetCmd_line();
 
 
 };
@@ -35,6 +45,7 @@ class BuiltInCommand : public Command {
 public:
 
     BuiltInCommand(const char *cmdLine);
+    BuiltInCommand(const char* cmd_line,SmallShell& smash);
 
     virtual ~BuiltInCommand() {}
 
@@ -67,11 +78,9 @@ public:
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-    char* last_pwd;
-    bool cd_reverse;
-    int error;
+    //char* last_pwd;
 public:
-    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    ChangeDirCommand(const char *cmdLine,SmallShell& smash);
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
@@ -126,11 +135,40 @@ class JobsList {
 public:
     class JobEntry {
         // TODO: Add your data members
+        unsigned int jobId;
+        Command* commandJob;
+        time_t jobStart;
+        unsigned int jobPid;
+        State jobState;
+    public:
+        //JobEntry &operator==(const JobEntry &jobEntry);
+        //JobEntry &operator!=(const JobEntry &jobEntry)= default;
+        //JobEntry &operator++();
+        JobEntry(unsigned int jid,Command* command);
+        JobEntry(const JobEntry& jobEntry)= default;
+
+
+        bool operator<(const JobEntry &jobEntry) const;
+        friend ostream& operator<<( ostream& os,JobEntry& je);
+        unsigned int GetJobId();
+        unsigned int GetJobPid();
+        double GetJobElapsed();
+        State  GetJobState();
+        string  GetJobCmdLine();
+        void  zeroJobStart();
+        void  SetJobState(State newState);
+
+
     };
     // TODO: Add your data members
+    vector<JobEntry> jobsVector;
+    unsigned int maxJobId;
+
 public:
     JobsList();
-    ~JobsList();
+    JobsList(const JobsList& jobsList)= delete;
+    void operator=(const JobsList& jobsList)= delete;
+    ~JobsList()= default;
     void addJob(Command* cmd, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
@@ -138,13 +176,24 @@ public:
     JobEntry * getJobById(int jobId);
     void removeJobById(int jobId);
     JobEntry * getLastJob(int* lastJobId);
+    unsigned int GetLastStoppedJobId();
     JobEntry *getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify exisitng ones as needed
+    void sortAndDelete();
+    void sortOnly();
+    unsigned int GetPidByJid(unsigned int Jid);
+    unsigned int GetMaxJobid();
+
+    void SetMaxJobid(unsigned int new_maxid);
+
+
+
 
 };
 
 class JobsCommand : public BuiltInCommand {
     // TODO: Add your data members
+    JobsList* jobsList_jobsCommand;
 public:
     JobsCommand(const char* cmd_line, JobsList* jobs);
     virtual ~JobsCommand() {}
@@ -161,6 +210,7 @@ public:
 
 class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
+    JobsList* jobsList_fgCommand;
 public:
     ForegroundCommand(const char* cmd_line, JobsList* jobs);
     virtual ~ForegroundCommand() {}
@@ -169,12 +219,17 @@ public:
 
 class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
+    JobsList* jobsList_bgCommand;
 public:
     BackgroundCommand(const char* cmd_line, JobsList* jobs);
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
-
+class FgBgException : public exception {
+    const char * what () const throw () {
+        return "FgBgExeption";
+    }
+};
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
@@ -183,7 +238,7 @@ public:
     virtual ~CopyCommand() {}
     void execute() override;
 };
-
+/*
 // TODO: add more classes if needed
 // maybe chprompt , timeout ?
 class ChpromptCommand : public BuiltInCommand {
@@ -192,12 +247,15 @@ public:
     virtual ~ChpromptCommand() {}
     void execute() override;
 };
-
+*/
 class SmallShell {
 private:
     // TODO: Add your data members
     string prompt;
-    char* plastPwd;
+    char* lastPwdSmash;
+    JobsList* jobsListSmash;
+    vector<Command>* commandVectorSmash;
+
     SmallShell();
 public:
     const string getPrompt()const;
@@ -216,6 +274,7 @@ public:
     // TODO: add extra methods as needed
 
     char* GetLastPwd();
+    void setLastPwd( char*& dir);
 };
 
 
