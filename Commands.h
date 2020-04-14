@@ -24,6 +24,7 @@ class Command {
 // TODO: Add your data members
 protected:
     std::string cmd_line;
+    int num_of_arg;
     char* args[COMMAND_MAX_ARGS+1];
     SmallShell* cmd_smash;
 public:
@@ -35,20 +36,13 @@ public:
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
     string GetCmd_line();
-
-
 };
 
-
 class BuiltInCommand : public Command {
-
 public:
-
     BuiltInCommand(const char *cmdLine);
     BuiltInCommand(const char* cmd_line,SmallShell& smash);
-
-    virtual ~BuiltInCommand() {}
-
+    virtual ~BuiltInCommand() {};
 };
 
 class ExternalCommand : public Command {
@@ -78,9 +72,11 @@ public:
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-    //char* last_pwd;
+    char* last_pwd;
+    bool cd_reverse;
+    int error;
 public:
-    ChangeDirCommand(const char *cmdLine,SmallShell& smash);
+    ChangeDirCommand(const char* cmd_line, char** plastPwd);
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
@@ -104,6 +100,8 @@ public:
 
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
+    JobsList* jl;
+public:
     QuitCommand(const char* cmd_line, JobsList* jobs);
     virtual ~QuitCommand() {}
     void execute() override;
@@ -130,8 +128,8 @@ public:
     void execute() override;
 };
 
-class JobsList {
 
+class JobsList {
 public:
     class JobEntry {
         // TODO: Add your data members
@@ -146,8 +144,6 @@ public:
         //JobEntry &operator++();
         JobEntry(unsigned int jid,Command* command);
         JobEntry(const JobEntry& jobEntry)= default;
-
-
         bool operator<(const JobEntry &jobEntry) const;
         friend ostream& operator<<( ostream& os,JobEntry& je);
         unsigned int GetJobId();
@@ -157,13 +153,10 @@ public:
         string  GetJobCmdLine();
         void  zeroJobStart();
         void  SetJobState(State newState);
-
-
     };
     // TODO: Add your data members
     vector<JobEntry> jobsVector;
     unsigned int maxJobId;
-
 public:
     JobsList();
     JobsList(const JobsList& jobsList)= delete;
@@ -183,12 +176,7 @@ public:
     void sortOnly();
     unsigned int GetPidByJid(unsigned int Jid);
     unsigned int GetMaxJobid();
-
     void SetMaxJobid(unsigned int new_maxid);
-
-
-
-
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -201,7 +189,9 @@ public:
 };
 
 class KillCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList& jl;
+    int jobID;
+    int signal;
 public:
     KillCommand(const char* cmd_line, JobsList* jobs);
     virtual ~KillCommand() {}
@@ -238,16 +228,7 @@ public:
     virtual ~CopyCommand() {}
     void execute() override;
 };
-/*
-// TODO: add more classes if needed
-// maybe chprompt , timeout ?
-class ChpromptCommand : public BuiltInCommand {
-public:
-    ChpromptCommand(const char* cmd_line);
-    virtual ~ChpromptCommand() {}
-    void execute() override;
-};
-*/
+
 class SmallShell {
 private:
     // TODO: Add your data members
@@ -255,7 +236,6 @@ private:
     char* lastPwdSmash;
     JobsList* jobsListSmash;
     vector<Command>* commandVectorSmash;
-
     SmallShell();
 public:
     const string getPrompt()const;
@@ -272,23 +252,17 @@ public:
     ~SmallShell();
     void executeCommand(const char* cmd_line);
     // TODO: add extra methods as needed
-
     char* GetLastPwd();
     void setLastPwd( char*& dir);
 };
 
 
-
-
-class chprompt : public BuiltInCommand {
-    SmallShell& smash;
+class Chprompt : public BuiltInCommand {
     string prompt;
 public:
-    chprompt( SmallShell& s, const char* new_prompt = "smash>");
-    void execute() override{
-        smash.setPrompt(this->prompt);
-    } ;
-    ~chprompt();
+    Chprompt( SmallShell* smash, const char* new_prompt = "smash>");
+    void execute() override;
+    ~Chprompt();
 };
 
 

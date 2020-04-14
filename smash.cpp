@@ -17,10 +17,16 @@ int main(int argc, char* argv[]) {
 
     SmallShell& smash = SmallShell::getInstance();
     while(true) {
-        std::cout << smash.getPrompt(); // TODO: change this (why?)
-        std::string cmd_line;
-        std::getline(std::cin, cmd_line);
-        smash.executeCommand(cmd_line.c_str());
+        try {
+            std::cout << smash.getPrompt(); // TODO: change this (why?)
+            std::string cmd_line;
+            std::getline(std::cin, cmd_line);
+            smash.executeCommand(cmd_line.c_str());
+        }
+        catch (...){
+            delete &smash;
+            break;
+        }
     }
     return 0;
 }
