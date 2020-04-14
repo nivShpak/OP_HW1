@@ -9,6 +9,9 @@
 #include <sys/types.h>
 #include "signals.h"
 
+#define FAIL -1
+#define SUCCESS 0
+
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -51,20 +54,13 @@ int _parseCommandLine(const char* cmd_line, char** args) {
     int i = 0;
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for(std::string s; iss >> s; ) {
-        args[i] = (char*)malloc(s.length()+1);
+        args[i] = (char*)malloc(s.length()+1); ///todo free malloc at D'stractor
         memset(args[i], 0, s.length()+1);
         strcpy(args[i], s.c_str());
         args[++i] = NULL;
     }
     return i;
-
     FUNC_EXIT()
-}
-
-void freeArgArray(char* arg[], int n){
-    for (int i=0 ; i<n ; ++i){
-        free(arg[i]);
-    }
 }
 
 bool _isBackgroundComamnd(const char* cmd_line) {
@@ -94,15 +90,14 @@ void _removeBackgroundSign(char* cmd_line) {
 
 ///==========================================================================================
 ///   Smash
-
-SmallShell::SmallShell() :prompt("smash>") {
+SmallShell::SmallShell() :prompt("smash>"),lastPwdSmash(get_current_dir_name()),commandVectorSmash(nullptr){
 // TODO: add your implementation
-    plastPwd= (char*)""; ///check that
-
+jobsListSmash=new JobsList();
 }
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
+delete jobsListSmash;
 }
 
 const string SmallShell::getPrompt() const{
@@ -117,25 +112,40 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     // For example:
 
     string cmd_s = string(cmd_line);
-
-    if (cmd_s.find("pwd") == 0) {
+    char* command_args[COMMAND_MAX_ARGS+1];
+  
+    if(_parseCommandLine(cmd_line,command_args)==0){
+        return nullptr;//empty command
+    }
+    if (strcmp(command_args[0],"pwd")==0) {
         return new GetCurrDirCommand(cmd_line);
     }
-    else if (cmd_s.find("cd") == 0){
+    else if (strcmp(command_args[0],"cd")==0) {
         cmd_line=cmd_line;
-        char** platPwdp=&this->plastPwd;
-        return new ChangeDirCommand(cmd_line,platPwdp);
+        //char** platPwdp=&this->lastPwdSmash;
+        return new ChangeDirCommand(cmd_line,(*this));
     }
-    else if (cmd_s.find("chprompt") == 0) {
-      return new Chprompt(this,cmd_line);
+    else if (strcmp(command_args[0],"chprompt")==0)  {
+      return new chprompt((*this),cmd_line);
     }
-    else if (cmd_s.find("showpid") == 0){
+    else if (strcmp(command_args[0],"showpid")==0) {
        return new ShowPidCommand(cmd_line);
     }
-    else if (cmd_s.find("kill")==0){
+    else if (strcmp(command_args[0],"jobs")==0) {
+        if(jobsListSmash->GetMaxJobid()==0)
+            return nullptr;
+        jobsListSmash->sortAndDelete();
+        return new JobsCommand(cmd_line,jobsListSmash);
+    }
+    else if (strcmp(command_args[0],"kill")==0){
         return new KillCommand(cmd_line, (this->jl));
     }
-
+    else if (strcmp(command_args[0],"fg")==0) {
+        return new ForegroundCommand(cmd_line,jobsListSmash);
+    }
+    else if (strcmp(command_args[0],"bg")==0) {
+        return new BackgroundCommand(cmd_line,jobsListSmash);
+    }
     return nullptr;
 }
 
@@ -159,63 +169,100 @@ char *SmallShell::GetLastPwd() {
     return plastPwd;
 }
 
+void SmallShell::setLastPwd(char*& dir) {
+    if(strcmp(strcpy(lastPwdSmash,dir),dir)!=0);
+}
 
 ///==========================================================================================
 ///   Command
+
 Command::Command(const char* cmd_line) {
     cmd_line=cmd_line;
     int check=_parseCommandLine(cmd_line,args);
 }
+
+Command::Command(const char *cmd_line, SmallShell &smash) {
+    cmd_line=cmd_line;
+    int check=_parseCommandLine(cmd_line,args);
+    //if(check==0) there was no command
+    cmd_smash=&smash;
+}
+
 Command::~Command(){
 }
-BuiltInCommand::BuiltInCommand(const char *cmdLine) : Command(cmdLine) {
 
+
+string Command::GetCmd_line() {
+    return cmd_line;
 }
 
+
+BuiltInCommand::BuiltInCommand(const char *cmdLine) : Command(cmdLine) {
+}
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line, SmallShell &smash) : Command(cmd_line, smash){
+}
+
+
 ///==========================================================================================
-///      PWD
-
+///   GWD
 GetCurrDirCommand::GetCurrDirCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
-
 }
 
 
 void GetCurrDirCommand::execute() {
-    printf("%s\n",get_current_dir_name());
+    cout<<get_current_dir_name()<<endl;
 }
 
 ///==========================================================================================
-///      CD Class
+///   CD
+ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell& smash) : BuiltInCommand(cmdLine,smash) {
+}
 
 ChangeDirCommand::ChangeDirCommand(const char *cmdLine,  char** plastPwd= nullptr) : BuiltInCommand(cmdLine) {
     last_pwd=*plastPwd; //fix it, problem when cd isnt legal
     char* current_dir=get_current_dir_name();
     if(strcmp(*plastPwd,current_dir)!=0) //we cant come back to the same dir
         *plastPwd=current_dir;
-
 }
+
 void ChangeDirCommand::execute() {
+    char* current_dir=get_current_dir_name();
     if(args[2]!= nullptr){
-        printf("smash error: cd: too many arguments\n");
+        cout<<"smash error: cd: too many arguments"<<endl;
         return;
     }
     if(strcmp(args[1],"-")==0) {
-        if(last_pwd==""){
-            printf("smash error: cd: OLDPWD not set\n");
+        if(strcmp(cmd_smash->GetLastPwd(),current_dir)==0){
+           cout<<"smash error: cd: OLDPWD not set"<<endl;
             return;
         }
-        chdir(last_pwd);
+        if(chdir(cmd_smash->GetLastPwd())==FAIL){
+            ///perror
+            return;
+        }
+        cmd_smash->setLastPwd(current_dir);
         return;
     }
 
-    chdir(args[1]);
+    if(chdir(args[1])==FAIL){
+        ///perror
+        return;
+    }
+    cmd_smash->setLastPwd(current_dir);
 }
+
 ///==========================================================================================
 ///      Crprompt
 
 Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line) {
     this->smash = s;
     if (this->num_of_arg==1) {
+
+chprompt::chprompt(SmallShell &s, const char *cmd_line):BuiltInCommand(cmd_line), smash(s) {
+    char* args[20];
+    int num = _parseCommandLine(cmd_line, args);
+    if (num==1) {
         this->prompt ="smash>";
     }
     else {
@@ -234,6 +281,7 @@ void Chprompt::execute() {
 void ShowPidCommand::execute(){
     cout<<"smash pid is " << getpid() <<endl;
 }
+
 ///==========================================================================================
 ///      Kill
 
@@ -278,3 +326,279 @@ void QuitCommand::execute() {
     delete jl;
     throw "Quit smash";
 }
+        
+///==========================================================================================
+///      
+  
+unsigned int FgBgCheck(char** args, JobsList* jobs, const char *s, JobsList::JobEntry* job){
+    unsigned int jid=0;
+    if(args[1]== nullptr)
+        jid=jobs->GetMaxJobid();
+    else {
+        try {
+            jid = stoul(args[1]);
+        }
+        catch(invalid_argument){
+            cout<<"smash error: "<<s<<": invalid arguments"<<endl;
+            throw FgBgException();
+        }
+        //error massages
+    }
+    if((strcmp(s,"fg")==0)&& jobs->GetMaxJobid()==0){
+        cout<<"smash error: "<<s<<": jobs list is empty"<<endl;
+        throw FgBgException();
+    }
+    if((strcmp(s,"bg")==0)&& jobs->GetLastStoppedJobId()==0){
+        cout<<"smash error: "<<s<<": there is no stopped jobs to resume"<<endl;
+        throw FgBgException();
+    }
+
+    job=jobs->getJobById(jid);
+    if(job== nullptr) {
+        cout << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
+        throw FgBgException();
+    }
+    if((strcmp(s,"bg")==0)&&job->GetJobState()==BgState){
+        cout << "smash error: "<<s<<": job-id " << jid << " dis already running in the background" << endl;
+        throw FgBgException();
+    }
+    cout<<job->GetJobCmdLine()<<" : "<<job->GetJobId()<<endl;
+    unsigned int jPid=job->GetJobPid();
+    return jPid;
+}
+
+///==========================================================================================
+///     Fg   
+ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_fgCommand(jobs) {
+
+
+}
+
+
+void ForegroundCommand::execute() {
+    unsigned int jPid=0;
+    unsigned int jid;
+    JobsList::JobEntry* job;
+    try{
+        jPid=FgBgCheck(args,jobsList_fgCommand,"fg",job);
+    }
+    catch(FgBgException& e){
+        return;
+    }
+    jid=job->GetJobId();
+    jobsList_fgCommand->removeJobById(jid);
+    jobsList_fgCommand->sortOnly();
+    int checkKill=kill(jPid, SIGCONT);
+    int wstatus;
+    if(checkKill==SUCCESS)
+        waitpid(jPid, &wstatus,0 ); //maybe we want wstatus?
+
+
+
+
+}
+///==============================================================================
+///   Bg
+BackgroundCommand::BackgroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_bgCommand(jobs) {
+}
+
+
+void BackgroundCommand::execute() {
+    unsigned int jPid=0;
+    unsigned int jid;
+    JobsList::JobEntry* job;
+    try{
+        jPid=FgBgCheck(args,jobsList_bgCommand,"bg",job);
+    }
+    catch(FgBgException& e){
+        return;
+    }
+    jid=job->GetJobId();
+    jobsList_bgCommand->getJobById(jid)->SetJobState(BgState);
+    int checkKill=kill(jPid, SIGCONT);
+    //if(checkKill==SUCCESS)
+    //maybe we want wstatus?
+    jobsList_bgCommand->removeJobById(jid);
+
+}
+      
+///==========================================================================================
+///   Jobs
+      
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(cmd_line),jobsList_jobsCommand(jobs){
+}
+
+
+void JobsCommand::execute() {
+    jobsList_jobsCommand->printJobsList();
+}
+
+///==========================================================================================
+///   jobs list
+
+JobsList::JobsList():maxJobId(0) {
+}
+
+void JobsList::removeFinishedJobs() {
+    int size = jobsVector.size();
+    for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
+        if (it->GetJobState() == FinishState) {
+            if (maxJobId < it->GetJobId()) {
+                this->SetMaxJobid(jobsVector[size - 1].GetJobId());
+                size--;
+            }
+            jobsVector.erase(it);
+        }
+    }
+}
+      
+void JobsList::sortOnly(){
+    sort(jobsVector.begin(), jobsVector.end());
+}
+      
+void JobsList::sortAndDelete(){
+    removeFinishedJobs(); //vector neede alaways to be sorted
+    this->sortOnly();
+}
+
+unsigned int JobsList::GetMaxJobid() {
+    return maxJobId;
+}
+      
+unsigned int JobsList::GetLastStoppedJobId() {
+    int jid=0;
+    getLastStoppedJob(&jid);
+    return jid;
+}
+      
+void JobsList::SetMaxJobid(unsigned int new_maxid) {
+    maxJobId=new_maxid;
+}
+
+unsigned int JobsList::GetPidByJid(unsigned int Jid) {
+    for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
+        if (it->GetJobId() == Jid) {
+            return it->GetJobPid();
+        }
+    }
+    return FAIL;
+}
+
+void JobsList::printJobsList() {
+    int size = jobsVector.size();
+    for (int i=0; i<size; ++i) {
+        cout<<jobsVector[i];
+    }
+}
+
+ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
+    State je_State=je.GetJobState();
+    char* s= nullptr;
+    if(je_State==StoppedState){
+        strcpy(s,"(stooped\n");
+    } else
+        strcpy(s,"\n");
+    os<<"["<<je.GetJobId()<<"]"<<je.GetJobCmdLine()<<": "<<je.GetJobPid()<<je.GetJobElapsed()<<s<<endl;
+    return os;
+}
+
+void JobsList::killAllJobs() {
+    for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it)
+        jobsVector.erase(it);
+}
+      
+void JobsList::addJob(Command *cmd, bool isStopped) {
+    jobsVector.push_back(JobEntry(maxJobId+1,  cmd));
+    maxJobId++;
+}
+      
+void JobsList::removeJobById(int jobId) {
+    int size = jobsVector.size();
+    for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
+        if (it->GetJobId() == jobId) {
+            if (maxJobId == it->GetJobId()) {
+                this->SetMaxJobid(jobsVector[size - 1].GetJobId());
+            }
+            jobsVector.erase(it);
+            return;
+        }
+    }
+}
+      
+JobsList::JobEntry *JobsList::getLastJob(int *lastJobId) {
+    if(jobsVector.empty())
+        return nullptr;
+    return &jobsVector[jobsVector.size()-1];
+}
+
+JobsList::JobEntry *JobsList::getLastStoppedJob(int *jobId) {
+    if(jobsVector.empty())
+        return nullptr;
+    int size = jobsVector.size();
+    for (int i = size-1; i < size; --i) {
+        if(jobsVector[i].GetJobState()==StoppedState)
+            *jobId=jobsVector[i].GetJobId();
+            return &jobsVector[i];
+    }
+}
+
+
+///==========================================================================================
+///   job entry
+      
+JobsList::JobEntry::JobEntry(unsigned int jid, Command* command):jobId(jid),commandJob(command) {
+    jobStart=time(nullptr);
+    jobPid=getpid();
+    jobState=BgState;
+
+}
+bool JobsList::JobEntry::operator<(const JobsList::JobEntry &jobEntry) const {
+    return this->jobId<jobEntry.jobId;
+}
+
+
+unsigned int JobsList::JobEntry::GetJobId() {
+    return jobId;
+}
+
+unsigned int JobsList::JobEntry::GetJobPid() {
+    return jobPid;
+}
+
+double JobsList::JobEntry::GetJobElapsed() {
+    time_t currentTime;
+    currentTime=time(nullptr);
+    return difftime(jobStart,currentTime);///check about fault
+}
+      
+State JobsList::JobEntry::GetJobState() {
+    return jobState;
+}
+      
+void JobsList::JobEntry::zeroJobStart() {
+    time_t currentTime;
+    currentTime=time(nullptr);
+    jobStart=currentTime;
+
+}
+
+void JobsList::JobEntry::SetJobState(State newState) {
+    jobState=newState;
+
+}
+      
+string JobsList::JobEntry::GetJobCmdLine() {
+    return this->commandJob->GetCmd_line();
+}
+
+JobsList::JobEntry* JobsList::getJobById(int jobId) {
+    int size = jobsVector.size();
+    for (int i=0; i<size; ++i) {
+        if(i==jobId)
+            return &jobsVector[i];
+    }
+    return nullptr;
+}
+
+///==========================================================================================
+///   
