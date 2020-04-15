@@ -167,7 +167,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     }
 
     else {
-        return new ExternalCommand(cmd_line, this);
+        return new ExternalCommand(cmd_line, *this); ///its refernce for command
     }
     return nullptr;
 }
@@ -644,8 +644,8 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
 ///==========================================================================================
 ///   External
 
-ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell* smash) :Command(cmd_line) {
-    this->cmd_smash = smash;
+ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash) :Command(cmd_line,smash) {
+    //this->cmd_smash = smash; its in Command constractur
     this->num_of_arg = _parseCommandLine(cmd_line, this->args);
     if (_isBackgroundComamnd(cmd_line)) this->run = Back;
     else this->run = Front;
@@ -701,7 +701,7 @@ void RedirectionCommand::execute() {
         if(strcmp(args[1],">>")==0){
             fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
         }
-        if(_isBackgroundComamnd(cmd_line.c_str())){
+        if(_isBackgroundComamnd(cmd_line)){
             inner_cmd.push_back('&');
         }
         try{
@@ -730,39 +730,6 @@ PipeCommand::PipeCommand(const char *cmdLine,SmallShell& smash) : Command(cmdLin
 }
 
 void PipeCommand::execute() {
-    pid_t p = fork();
-    string inner_cmd;
-    inner_cmd=args[0];
-    if (p == 0) { //the son do the rediraction
-        close(1); //closes stdout
 
-        int fd;
-        mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-        char *filename =args[2];
-        if(strcmp(args[1],">")==0){
-            fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, mode);
-
-        }
-        if(strcmp(args[1],">>")==0){
-            fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
-        }
-        if(_isBackgroundComamnd(cmd_line.c_str())){
-            inner_cmd.push_back('&');
-        }
-        try{
-            cmd_smash->executeCommand(inner_cmd.c_str());//open file no matter
-
-        }
-        catch(SmallShellException& e){
-            int checkDelete=remove(filename);//if the cmd is illigal delete file, but if it opend befor?
-        }
-
-        close(fd);
-        exit(0);
-
-
-    } else{
-        wait(NULL);
-    }
 
 }

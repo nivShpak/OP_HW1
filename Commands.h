@@ -56,7 +56,7 @@ public:
 class ExternalCommand : public Command {
     Run run = Front;
 public:
-    ExternalCommand(const char* cmd_line,SmallShell* smash);
+    ExternalCommand(const char* cmd_line,SmallShell& smash);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
