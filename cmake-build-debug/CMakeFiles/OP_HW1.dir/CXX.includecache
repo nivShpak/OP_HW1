@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/home/student/Desktop/OP_HW1/Commands.cpp
+/home/student/Desktop/Git1/Commands.cpp
 unistd.h
 -
 string.h
@@ -22,11 +22,49 @@ sys/wait.h
 iomanip
 -
 Commands.h
-/home/student/Desktop/OP_HW1/Commands.h
+/home/student/Desktop/Git1/Commands.h
 sys/types.h
 -
+signals.h
+/home/student/Desktop/Git1/signals.h
+sys/stat.h
+-
+fcntl.h
+-
 
-/home/student/Desktop/OP_HW1/Commands.h
+/home/student/Desktop/Git1/Commands.h
 vector
 -
+time.h
+/home/student/Desktop/Git1/time.h
+algorithm
+-
+
+/home/student/Desktop/Git1/signals.cpp
+iostream
+-
+signal.h
+-
+signals.h
+/home/student/Desktop/Git1/signals.h
+Commands.h
+/home/student/Desktop/Git1/Commands.h
+
+/home/student/Desktop/Git1/signals.h
+signal.h
+-
+
+/home/student/Desktop/Git1/smash.cpp
+iostream
+-
+unistd.h
+-
+sys/wait.h
+-
+signal.h
+-
+Commands.h
+/home/student/Desktop/Git1/Commands.h
+signals.h
+/home/student/Desktop/Git1/signals.h
 

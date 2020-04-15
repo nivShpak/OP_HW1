@@ -7,11 +7,18 @@
 #include <iomanip>
 #include "Commands.h"
 #include <sys/types.h>
+
+
 #include "signals.h"
+
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
 
 #define FAIL -1
 #define SUCCESS 0
-
+#define SPACE " "
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -90,13 +97,16 @@ void _removeBackgroundSign(char* cmd_line) {
 
 ///==========================================================================================
 ///   Smash
-SmallShell::SmallShell() :prompt("smash>"),lastPwdSmash(get_current_dir_name()),commandVectorSmash(nullptr){
+SmallShell::SmallShell() :prompt("smash>"),lastPwdSmash(get_current_dir_name()){
 // TODO: add your implementation
 jobsListSmash=new JobsList();
 }
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
+    for (auto it = commandVectorSmash.begin(); it != commandVectorSmash.end(); ++it) {
+        delete *it;
+    }
 delete jobsListSmash;
 }
 
@@ -113,17 +123,23 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
     string cmd_s = string(cmd_line);
     char* command_args[COMMAND_MAX_ARGS+1];
-  
     if(_parseCommandLine(cmd_line,command_args)==0){
         return nullptr;//empty command
     }
+    if(cmd_s.find(">")!=string::npos){
+        if ((strcmp(command_args[1],">")==0)||(strcmp(command_args[1],">>")==0) ){
+            return new RedirectionCommand(cmd_line,*this);
+        }
+    }
+
+
     if (strcmp(command_args[0],"pwd")==0) {
         return new GetCurrDirCommand(cmd_line);
     }
     else if (strcmp(command_args[0],"cd")==0) {
         cmd_line=cmd_line;
         //char** platPwdp=&this->lastPwdSmash;
-        return new ChangeDirCommand(cmd_line,this);
+        return new ChangeDirCommand(cmd_line,*this);
     }
     else if (strcmp(command_args[0],"chprompt")==0)  {
       return new Chprompt(this,cmd_line);
@@ -149,6 +165,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (strcmp(command_args[0],"quit")==0) {
         return new QuitCommand(cmd_line,this->jobsListSmash);
     }
+
     else {
         return new ExternalCommand(cmd_line, this);
     }
@@ -159,9 +176,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     //for example:
     Command* cmd = CreateCommand(cmd_line);
+    //jobsListSmash->addJob(cmd,false); //check
     if (cmd==NULL)
-        return; //todo: maybe error
+        throw SmallShellException(); //todo: maybe error
     cmd->execute();
+    this->commandVectorSmash.push_back(cmd);//so we can delete all cmds at the end of program;
     //delete cmd;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
@@ -191,9 +210,9 @@ Command::Command(const char* cmd_line):cmd_line(cmd_line) {
     this->num_of_arg = _parseCommandLine(cmd_line,this->args);
 }
 
-Command::Command(const char *cmd_line, SmallShell &smash) {
-    this->num_of_arg = _parseCommandLine(cmd_line,this->args);
-    cmd_line=cmd_line;
+Command::Command(const char *cmd_lineCons, SmallShell &smash) {
+    this->num_of_arg = _parseCommandLine(cmd_lineCons,this->args);
+    this->cmd_line=cmd_lineCons;
     cmd_smash=&smash;
 }
 
@@ -214,7 +233,7 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line, SmallShell &smash) : Comman
 
 
 ///==========================================================================================
-///   GWD
+///   GWDCommand
 GetCurrDirCommand::GetCurrDirCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 }
 
@@ -224,9 +243,9 @@ void GetCurrDirCommand::execute() {
 }
 
 ///==========================================================================================
-///   CD
-ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell* smash) : BuiltInCommand(cmdLine) {
-    this->cmd_smash = smash;
+///   CDCommand
+ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell& smash) : BuiltInCommand(cmdLine,smash) {
+    //this->cmd_smash = smash;
 }
 
 ChangeDirCommand::ChangeDirCommand(const char *cmdLine,  char** plastPwd= nullptr) : BuiltInCommand(cmdLine) {
@@ -249,6 +268,7 @@ void ChangeDirCommand::execute() {
         }
         if(chdir(cmd_smash->GetLastPwd())==FAIL){
             ///perror
+            perror("smash error: chdir failed");
             return;
         }
         cmd_smash->setLastPwd(current_dir);
@@ -257,13 +277,14 @@ void ChangeDirCommand::execute() {
 
     if(chdir(args[1])==FAIL){
         ///perror
+        perror("smash error: chdir failed");
         return;
     }
     cmd_smash->setLastPwd(current_dir);
 }
 
 ///==========================================================================================
-///      Crprompt
+///      CrpromptCommand
 
 Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line) {
     this->cmd_smash = s;
@@ -280,14 +301,14 @@ void Chprompt::execute() {
         cmd_smash->setPrompt(this->prompt);
 }
 ///==========================================================================================
-///      Showpid
+///      ShowpidCommand
 
 void ShowPidCommand::execute(){
     cout<<"smash pid is " << getpid() <<endl;
 }
 
 ///==========================================================================================
-///      Kill
+///      KillCommand
 
 KillCommand::KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jl(jobs){
       if (this->num_of_arg==3) {
@@ -321,7 +342,7 @@ void KillCommand::execute() {
 }
 
 ///==========================================================================================
-///      Quit
+///      QuitCommand
 
 QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) :BuiltInCommand(cmd_line){
     this->num_of_arg = _parseCommandLine(cmd_line,this->args);
@@ -339,15 +360,24 @@ void QuitCommand::execute() {
     }
         
 ///==========================================================================================
-///      
+///      FgBgCheck
   
 unsigned int FgBgCheck(char** args, JobsList* jobs, const char *s, JobsList::JobEntry* job){
     unsigned int jid=0;
+    bool enterid= false;
     if(args[1]== nullptr)
         jid=jobs->GetMaxJobid();
     else {
         try {
-            jid = stoul(args[1]);
+            string::size_type sz;
+            jid = stoi(args[1],&sz);//or stoul
+            string sub=string(args[1]).substr(sz);
+            if(sub.compare("")!=0||args[2]!= nullptr||args[1][0]=='-'){ //which kind of error "fg 0" returns?
+                cout<<"smash error: "<<s<<": invalid arguments"<<endl;
+                throw FgBgException();
+            }
+
+            enterid= true;
         }
         catch(invalid_argument){
             cout<<"smash error: "<<s<<": invalid arguments"<<endl;
@@ -355,11 +385,11 @@ unsigned int FgBgCheck(char** args, JobsList* jobs, const char *s, JobsList::Job
         }
         //error massages
     }
-    if((strcmp(s,"fg")==0)&& jobs->GetMaxJobid()==0){
+    if((strcmp(s,"fg")==0)&& jobs->GetMaxJobid()==0  && !enterid){
         cout<<"smash error: "<<s<<": jobs list is empty"<<endl;
         throw FgBgException();
     }
-    if((strcmp(s,"bg")==0)&& jobs->GetLastStoppedJobId()==0){
+    if((strcmp(s,"bg")==0)&& jobs->GetLastStoppedJobId()==0 && !enterid){
         cout<<"smash error: "<<s<<": there is no stopped jobs to resume"<<endl;
         throw FgBgException();
     }
@@ -379,7 +409,7 @@ unsigned int FgBgCheck(char** args, JobsList* jobs, const char *s, JobsList::Job
 }
 
 ///==========================================================================================
-///     Fg   
+///     FgCommand
 ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_fgCommand(jobs) {
 
 
@@ -397,19 +427,19 @@ void ForegroundCommand::execute() {
         return;
     }
     jid=job->GetJobId();
-    jobsList_fgCommand->removeJobById(jid);
-    jobsList_fgCommand->sortOnly();
     int checkKill=kill(jPid, SIGCONT);
     int wstatus;
     if(checkKill==SUCCESS)
         waitpid(jPid, &wstatus,0 ); //maybe we want wstatus?
+    jobsList_fgCommand->removeJobById(jid);//what happend when ctrl z send?
+    jobsList_fgCommand->sortOnly();
 
 
 
 
 }
 ///==============================================================================
-///   Bg
+///   BgCommand
 BackgroundCommand::BackgroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_bgCommand(jobs) {
 }
 
@@ -434,7 +464,7 @@ void BackgroundCommand::execute() {
 }
       
 ///==========================================================================================
-///   Jobs
+///   JobsCommand
       
 JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(cmd_line),jobsList_jobsCommand(jobs){
 }
@@ -502,16 +532,6 @@ void JobsList::printJobsList() {
     }
 }
 
-ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
-    State je_State=je.GetJobState();
-    char* s= nullptr;
-    if(je_State==StoppedState){
-        strcpy(s,"(stooped\n");
-    } else
-        strcpy(s,"\n");
-    os<<"["<<je.GetJobId()<<"]"<<je.GetJobCmdLine()<<": "<<je.GetJobPid()<<je.GetJobElapsed()<<s<<endl;
-    return os;
-}
 
 void JobsList::killAllJobs() {
     for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it)
@@ -579,7 +599,7 @@ unsigned int JobsList::JobEntry::GetJobPid() {
 double JobsList::JobEntry::GetJobElapsed() {
     time_t currentTime;
     currentTime=time(nullptr);
-    return difftime(jobStart,currentTime);///check about fault
+    return difftime(currentTime,jobStart);///check about fault
 }
       
 State JobsList::JobEntry::GetJobState() {
@@ -609,6 +629,16 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
             return &jobsVector[i];
     }
     return nullptr;
+}
+ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
+    State je_State=je.GetJobState();
+    string s;
+    if(je_State==StoppedState){
+        s=" (stooped)\n";
+    } else
+        s="\n";
+    os<<"["<<je.GetJobId()<<"]"<<SPACE<<je.GetJobCmdLine()<<" : "<<je.GetJobPid()<<SPACE<<je.GetJobElapsed()<<" secs"<<s<<endl;
+    return os;
 }
 
 ///==========================================================================================
@@ -644,4 +674,95 @@ void ExternalCommand::execute() {
         if (flag== -1)
                 perror("smash error: execv failed");
     }
+}
+///
+///==========================================================================================
+///   RedirectionCommand
+
+RedirectionCommand::RedirectionCommand(const char *cmdLine,SmallShell& smash) : Command(cmdLine,smash) {
+
+
+}
+
+void RedirectionCommand::execute() {
+    pid_t p = fork();
+    string inner_cmd;
+    inner_cmd=args[0];
+    if (p == 0) { //the son do the rediraction
+        close(1); //closes stdout
+
+        int fd;
+        mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+        char *filename =args[2];
+        if(strcmp(args[1],">")==0){
+            fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, mode);
+
+        }
+        if(strcmp(args[1],">>")==0){
+            fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
+        }
+        if(_isBackgroundComamnd(cmd_line.c_str())){
+            inner_cmd.push_back('&');
+        }
+        try{
+            cmd_smash->executeCommand(inner_cmd.c_str());//open file no matter
+
+        }
+        catch(SmallShellException& e){
+            int checkDelete=remove(filename);//if the cmd is illigal delete file, but if it opend befor?
+        }
+
+        close(fd);
+        exit(0);
+
+
+    } else{
+        wait(NULL);
+    }
+
+}
+///==========================================================================================
+///   RedirectionCommand
+
+PipeCommand::PipeCommand(const char *cmdLine,SmallShell& smash) : Command(cmdLine,smash) {
+
+
+}
+
+void PipeCommand::execute() {
+    pid_t p = fork();
+    string inner_cmd;
+    inner_cmd=args[0];
+    if (p == 0) { //the son do the rediraction
+        close(1); //closes stdout
+
+        int fd;
+        mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+        char *filename =args[2];
+        if(strcmp(args[1],">")==0){
+            fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, mode);
+
+        }
+        if(strcmp(args[1],">>")==0){
+            fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
+        }
+        if(_isBackgroundComamnd(cmd_line.c_str())){
+            inner_cmd.push_back('&');
+        }
+        try{
+            cmd_smash->executeCommand(inner_cmd.c_str());//open file no matter
+
+        }
+        catch(SmallShellException& e){
+            int checkDelete=remove(filename);//if the cmd is illigal delete file, but if it opend befor?
+        }
+
+        close(fd);
+        exit(0);
+
+
+    } else{
+        wait(NULL);
+    }
+
 }

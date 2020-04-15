@@ -24,7 +24,8 @@ using namespace std;
 class SmallShell;
 class Command;
 class JobsList;
-
+///==========================================================================================
+///   Command
 class Command {
 // TODO: Add your data members
 protected:
@@ -42,14 +43,16 @@ public:
     // TODO: Add your extra methods if needed
     string GetCmd_line();
 };
-
+///==========================================================================================
+///   BuiltInCommand
 class BuiltInCommand : public Command {
 public:
     BuiltInCommand(const char *cmdLine);
     BuiltInCommand(const char* cmd_line,SmallShell& smash);
     virtual ~BuiltInCommand() {};
 };
-
+///==========================================================================================
+///   ExternalCommand
 class ExternalCommand : public Command {
     Run run = Front;
 public:
@@ -57,44 +60,60 @@ public:
     virtual ~ExternalCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   PipeCommand
 class PipeCommand : public Command {
     // TODO: Add your data members
 public:
     PipeCommand(const char* cmd_line);
+    explicit PipeCommand(const char *cmdLine,SmallShell& smash);
     virtual ~PipeCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   RedirectionCommand
 class RedirectionCommand : public Command {
     // TODO: Add your data members
 public:
-    explicit RedirectionCommand(const char* cmd_line);
+    explicit RedirectionCommand(const char *cmdLine);
+    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash);
+
     virtual ~RedirectionCommand() {}
     void execute() override;
     //void prepare() override;
     //void cleanup() override;
 };
+///==========================================================================================
+///   Chprompt
+class Chprompt : public BuiltInCommand {
+    string prompt;
+public:
+    Chprompt( SmallShell* smash, const char* new_prompt = "smash>");
+    void execute() override;
+    ~Chprompt();
+};
 
+///==========================================================================================
+///   Cd
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
     char* last_pwd;
-    bool cd_reverse;
-    int error;
 public:
-    ChangeDirCommand(const char* cmd_line, SmallShell* smash);
+    ChangeDirCommand(const char* cmd_line, SmallShell& smash);
     ChangeDirCommand(const char* cmd_line, char** plastPwd);
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   Pwd
 class GetCurrDirCommand : public BuiltInCommand {
 public:
     GetCurrDirCommand(const char *cmdLine);
     virtual ~GetCurrDirCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   ShowPid
 class ShowPidCommand : public BuiltInCommand {
 public:
   ShowPidCommand(const char* cmd_line):BuiltInCommand(cmd_line){};
@@ -104,7 +123,8 @@ public:
 
 
 
-
+///==========================================================================================
+///   Quit
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
     JobsList* jl;
@@ -113,7 +133,8 @@ public:
     virtual ~QuitCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   History not relevant
 class CommandsHistory {
 protected:
     class CommandHistoryEntry {
@@ -135,7 +156,8 @@ public:
     void execute() override;
 };
 
-
+///==========================================================================================
+///   JobsList
 class JobsList {
 public:
     class JobEntry {
@@ -185,7 +207,8 @@ public:
     unsigned int GetMaxJobid();
     void SetMaxJobid(unsigned int new_maxid);
 };
-
+///==========================================================================================
+///   JobsCommand
 class JobsCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_jobsCommand;
@@ -194,7 +217,8 @@ public:
     virtual ~JobsCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   Kill
 class KillCommand : public BuiltInCommand {
     KillCommand(const char *cmd_line, JobsList& jobs);
     JobsList* jl;
@@ -205,7 +229,8 @@ public:
     virtual ~KillCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   Fg
 class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_fgCommand;
@@ -214,7 +239,8 @@ public:
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
-
+///==========================================================================================
+///   Bg
 class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_bgCommand;
@@ -223,6 +249,8 @@ public:
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
+///==========================================================================================
+///   FgBgExeption
 class FgBgException : public exception {
     const char * what () const throw () {
         return "FgBgExeption";
@@ -236,6 +264,8 @@ public:
     virtual ~CopyCommand() {}
     void execute() override;
 };
+///==========================================================================================
+///   SmallShell
 
 class SmallShell {
 private:
@@ -243,7 +273,7 @@ private:
     string prompt;
     char* lastPwdSmash;
     JobsList* jobsListSmash;
-    vector<Command>* commandVectorSmash;
+    vector<Command*> commandVectorSmash;
     SmallShell();
 public:
     const string getPrompt()const;
@@ -265,14 +295,13 @@ public:
     void addJob(Command* cmd);
 };
 
-
-class Chprompt : public BuiltInCommand {
-    string prompt;
-public:
-    Chprompt( SmallShell* smash, const char* new_prompt = "smash>");
-    void execute() override;
-    ~Chprompt();
+///==========================================================================================
+///   SmallShellExeption
+class SmallShellException : public exception {
+    const char * what () const throw () {
+        return "SmallShellExeption";
+    }
 };
-
-
+///==========================================================================================
+///
 #endif //SMASH_COMMAND_H_

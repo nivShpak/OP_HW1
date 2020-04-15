@@ -1,3 +1,3 @@
-/home/student/Desktop/OP_HW1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/student/Desktop/OP_HW1/cmake-build-debug/CMakeFiles/OP_HW1.dir
-/home/student/Desktop/OP_HW1/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/student/Desktop/Git1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/student/Desktop/Git1/cmake-build-debug/CMakeFiles/OP_HW1.dir
+/home/student/Desktop/Git1/cmake-build-debug/CMakeFiles/edit_cache.dir

@@ -3,6 +3,7 @@
 
 CMakeFiles/OP_HW1.dir/Commands.cpp.o: ../Commands.cpp
 CMakeFiles/OP_HW1.dir/Commands.cpp.o: ../Commands.h
+CMakeFiles/OP_HW1.dir/Commands.cpp.o: ../signals.h
 
 CMakeFiles/OP_HW1.dir/signals.cpp.o: ../Commands.h
 CMakeFiles/OP_HW1.dir/signals.cpp.o: ../signals.cpp
