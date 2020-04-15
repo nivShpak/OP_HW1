@@ -14,6 +14,11 @@ enum State
     StoppedState
 };
 
+enum Run{
+    Front,
+    Back
+};
+
 using namespace std;
 
 class SmallShell;
@@ -23,7 +28,7 @@ class JobsList;
 class Command {
 // TODO: Add your data members
 protected:
-    std::string cmd_line;
+    const char *cmd_line;
     int num_of_arg;
     char* args[COMMAND_MAX_ARGS+1];
     SmallShell* cmd_smash;
@@ -46,8 +51,9 @@ public:
 };
 
 class ExternalCommand : public Command {
+    Run run = Front;
 public:
-    ExternalCommand(const char* cmd_line);
+    ExternalCommand(const char* cmd_line,SmallShell* smash);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -256,6 +262,7 @@ public:
     // TODO: add extra methods as needed
     char* GetLastPwd();
     void setLastPwd( char*& dir);
+    void addJob(Command* cmd);
 };
 
 

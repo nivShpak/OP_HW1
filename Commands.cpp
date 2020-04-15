@@ -149,6 +149,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (strcmp(command_args[0],"quit")==0) {
         return new QuitCommand(cmd_line,this->jobsListSmash);
     }
+    else {
+        return new ExternalCommand(cmd_line, this);
+    }
     return nullptr;
 }
 
@@ -159,7 +162,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     if (cmd==NULL)
         return; //todo: maybe error
     cmd->execute();
-    delete cmd;
+    //delete cmd;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -175,6 +178,11 @@ char* SmallShell::GetLastPwd() {
 void SmallShell::setLastPwd(char*& dir) {
     if(strcmp(strcpy(lastPwdSmash,dir),dir)!=0);
 }
+
+void SmallShell::addJob(Command *cmd) {
+    this->jobsListSmash->addJob(cmd);
+}
+
 
 ///==========================================================================================
 ///   Command
@@ -604,4 +612,36 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
 }
 
 ///==========================================================================================
-///   
+///   External
+
+ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell* smash) :Command(cmd_line) {
+    this->cmd_smash = smash;
+    this->num_of_arg = _parseCommandLine(cmd_line, this->args);
+    if (_isBackgroundComamnd(cmd_line)) this->run = Back;
+    else this->run = Front;
+}
+
+void ExternalCommand::execute() {
+    char cmd[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(cmd, cmd_line);
+    if (run==Back) _removeBackgroundSign(cmd);
+    _trim(cmd);
+    char* _args[4] = {(char*)"/bin/bash", (char*)"-c", cmd, NULL};
+    pid_t pid = fork();
+    if (pid<0){
+        perror("smash error: fork failed");
+    }
+    if (pid>0) {
+        if (this->run == Front){
+            wait(NULL);
+        }else{
+            this->cmd_smash->addJob(this);
+        }
+    }
+    else {
+        int flag = execv(_args[0],_args);
+        //todo: add checks
+        if (flag== -1)
+                perror("smash error: execv failed");
+    }
+}
