@@ -139,7 +139,7 @@ const string SmallShell::getPrompt() const{
 
 
 
-Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip) {
+Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip=false) {
 
     // For example:
     bool isFirst=true;
@@ -501,8 +501,9 @@ void ForegroundCommand::execute() {
         front_pid = jPid;
         waitpid(jPid,&wstatus,WUNTRACED);
         if(WIFSTOPPED(wstatus)){
-            this->cmd_smash->addJob(this,jPid, StoppedState);
+            this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
         }
+        cout<<"check"<<endl;
         front_pid = 0;
     }
     jobsList_fgCommand->removeJobById(jid);//what happend when ctrl z send?
@@ -635,6 +636,7 @@ void JobsList::killAllJobs() {
 }
       
 void JobsList::addJob(Command *cmd, pid_t pid, State state) {
+    this->removeFinishedJobs();
     jobsVector.push_back(JobEntry(maxJobId+1,cmd,pid,state));
     maxJobId++;
 }

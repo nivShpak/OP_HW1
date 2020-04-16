@@ -41,6 +41,7 @@ protected:
     char* args[COMMAND_MAX_ARGS+1];
     SmallShell* cmd_smash;
     unsigned int cmd_pid=0;
+    bool isRedPip;
 public:
     Command(const char* cmd_line);
     Command(const char* cmd_line,SmallShell& smash);
@@ -66,7 +67,7 @@ public:
 class ExternalCommand : public Command {
     Run run = Front;
 public:
-    ExternalCommand(const char* cmd_line,SmallShell& smash);
+    ExternalCommand(const char* cmd_line,SmallShell& smash,bool);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -305,7 +306,7 @@ private:
 public:
     const string getPrompt()const;
     void setPrompt(string new_prompt);
-    Command *CreateCommand(const char* cmd_line);
+    Command *CreateCommand(const char* cmd_line,bool isRedPip);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton
@@ -315,7 +316,7 @@ public:
         return instance;
     }
     ~SmallShell();
-    void executeCommand(const char* cmd_line);
+    void executeCommand(const char* cmd_line, bool isRedPip=false);
     // TODO: add extra methods as needed
     char* GetLastPwd();
     void setLastPwd( char*& dir);
