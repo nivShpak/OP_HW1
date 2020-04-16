@@ -139,7 +139,7 @@ const string SmallShell::getPrompt() const{
 
 
 
-Command * SmallShell::CreateCommand(const char* cmd_line) {
+Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip) {
 
     // For example:
     bool isFirst=true;
@@ -213,16 +213,16 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new CpCommand(built_in_cmd_line,*this, run);
     }
     else {
-        return new ExternalCommand(cmd_line, *this); ///its refernce for command
+        return new ExternalCommand(cmd_line, *this,isRedPip); ///its refernce for command
     }
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line) {
+void SmallShell::executeCommand(const char *cmd_line,bool isRedPipConst) {
     // TODO: Add your implementation here
     //for example:
-    Command* cmd = CreateCommand(cmd_line);
-    //jobsListSmash->addJob(cmd,false); //check
+    Command* cmd = CreateCommand(cmd_line,isRedPipConst);
+
     if (cmd==NULL)
         throw SmallShellException(); //todo: maybe error
     cmd->execute();
@@ -759,8 +759,9 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
 ///==========================================================================================
 ///   External
 
-ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash) :Command(cmd_line,smash) {
+ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,bool isRedPipConst) :Command(cmd_line,smash) {
     //this->cmd_smash = smash; its in Command constractur
+    this->isRedPip=isRedPipConst;
     this->num_of_arg = _parseCommandLine(cmd_line, this->args);
     if (_isBackgroundComamnd(cmd_line)) this->run = Back;
     else this->run = Front;
@@ -786,7 +787,9 @@ void ExternalCommand::execute() {
             }
             front_pid = 0;
         }else{//this is smash pid
-            this->cmd_smash->addJob(this,pid);
+            if(!isRedPip)
+
+                this->cmd_smash->addJob(this,pid);
         }
     }
     else {//son
@@ -827,6 +830,7 @@ void RedirectionCommand::execute() {
 
     cmdLine1=fullCmd_line.substr(0,bufStart+1);
     cmdLine2=fullCmd_line.substr(bufEnd);
+    _removeBackgroundSign((char*)cmdLine2.c_str());
     //pid_t p = fork();
 
     if(_isBackgroundComamnd(cmd_line.c_str())){
@@ -842,8 +846,7 @@ void RedirectionCommand::execute() {
     strcpy(charCmdLine2, cmdLine2.c_str());
 
 
-    //if (p == 0) { //the son do the rediraction
-        //setpgrp()
+
     int fd1=dup(1);
     if(fd1==FAIL){
         //exeption
@@ -862,7 +865,8 @@ void RedirectionCommand::execute() {
     }
 
     try{
-        cmd_smash->executeCommand(charCmdLine1);//open file no matter
+        cmd_smash->executeCommand(charCmdLine1,true);//open file no matter
+
 
     }
     catch(SmallShellException& e){
@@ -874,17 +878,8 @@ void RedirectionCommand::execute() {
     if(fd2==FAIL){
         //exeption
     }
-        //exit(0);
 
 
-    /*}
-
-     if (p<0){
-         perror("smash error: fork failed");
-     }else{
-         wait(NULL);
-     }
-     */
 
 }
 ///==========================================================================================
@@ -918,50 +913,77 @@ void PipeCommand::execute() {
         cmdLine1.push_back('&');
         cmdLine2.push_back('&');
     }
-
-    /*
-    int n1 = cmdLine1.length();
-    // declaring character array
-    char charCmdLine1[n1 + 1];
-    int n2 = cmdLine2.length();
-    // declaring character array
-    char charCmdLine2[n2 + 1];
-    strcpy(charCmdLine1, cmdLine1.c_str());
-    strcpy(charCmdLine2, cmdLine2.c_str());
-    */
-
-    int fd[2];
-    pipe(fd);
-    pid_t p1 = fork();
-    if (p1 == 0) {
-        // first child
+    int status;
+    pid_t p0 = fork();
+    if(p0<0)
+        perror("smash error: fork failed");
+    if(p0==0) {//pipe process
         setpgrp();
-        if(strcmp(cmdLine1.c_str(),"|")==0){
-            dup2(fd[1],1);
+
+
+        int fd[2];
+        pipe(fd);
+        pid_t p1 = fork();
+        if (p1 == 0) {// first child
+            setpgrp();
+
+            if (firstOption) {
+                //close(1);
+                //dup(fd[1]);
+                dup2(fd[1], 1);
+
+            }
+            if (!firstOption) {
+                //close(2);
+                //dup(fd[1]);
+                dup2(fd[1], 2);
+
+            }
+
+            close(fd[0]);
+            close(fd[1]);
+            cmd_smash->executeCommand(cmdLine1.c_str(), true);
+
+
+
+            exit(0);
         }
-        if(strcmp(cmdLine2.c_str(),"|&")==0){
-            dup2(fd[1],2);
+        if (p1 < 0) {
+            perror("smash error: fork failed");
         }
-        close(fd[0]);
-        close(fd[1]);
-        cmd_smash->executeCommand(cmdLine1.c_str());
+        if(p1>0) {//pipe process
+
+            //waitpid(p1,&status,0);
+            pid_t p2 = fork();
+            if (p2 == 0) {// second child
+                setpgrp();
+                //close(0);
+                //dup(fd[0]);
+                dup2(fd[0], 0);
+                close(fd[0]);
+                close(fd[1]);
+                cmd_smash->executeCommand(cmdLine2.c_str(), true);
+
+                exit(0);
+            }
+            if (p2 < 0) {//pid not good
+                perror("smash error: fork failed");
+            }
+            if(p2>0) { //pipe process
+                close(fd[0]);
+                close(fd[1]);
+                //waitpid(p2,&status,0);
+
+            }
+        }
         exit(0);
+
     }
-    pid_t p2 = fork();
-    if (p2 == 0) {
-        // second child
-        setpgrp();
-        dup2(fd[0],0);
-        close(fd[0]);
-        close(fd[1]);
-        cmd_smash->executeCommand(cmdLine2.c_str());
-        exit(0);
+    else{
+        //smash process
+        //waitpid(p0,&status,0);
+        this->cmd_smash->addJob(this,p0);
     }
-    close(fd[0]);
-    close(fd[1]);
-
-
-
 
 }
 

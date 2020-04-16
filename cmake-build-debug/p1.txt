@@ -1,0 +1,13 @@
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+Makefile
+OP_HW1
+OP_HW1Git
+OP_HW1Git.cbp
+p1.txt
+pipe1.cpp
+pipe1.out
+pipe2.cpp
+pipe2.out
+untitled.cbp

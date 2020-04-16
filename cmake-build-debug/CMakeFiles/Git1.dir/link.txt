@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/Git1.dir/smash.cpp.o CMakeFiles/Git1.dir/Commands.cpp.o CMakeFiles/Git1.dir/signals.cpp.o  -o Git1 
