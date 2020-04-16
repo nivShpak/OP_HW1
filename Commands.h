@@ -7,6 +7,7 @@
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
+
 enum State
 {
     FinishState,
@@ -21,10 +22,15 @@ enum Run{
 
 using namespace std;
 
+
+int _parsrCommandLine_t(const char* cmd_line, vector<string>& args);
+
 class SmallShell;
 class Command;
 class JobsList;
+class JobsList;
 class EmptyCommandException : public exception {};
+__pid_t getFrontPid ();
 ///==========================================================================================
 ///   Command
 class Command {
@@ -145,9 +151,11 @@ public:
 
 class CpCommand : public BuiltInCommand {
 // TODO: Add your data members public:
+    int src;
+    int dst;
     Run run;
 public:
-    CpCommand(const char* cmd_line, SmallShell& smash);
+    CpCommand(const char* cmd_line, SmallShell& smash, Run run);
     virtual ~CpCommand() {};
     void execute() override;
 };
@@ -190,7 +198,7 @@ public:
         //JobEntry &operator==(const JobEntry &jobEntry);
         //JobEntry &operator!=(const JobEntry &jobEntry)= default;
         //JobEntry &operator++();
-        JobEntry(unsigned int jid,Command* command,pid_t pid);
+        JobEntry(unsigned int jid,Command* command,pid_t pid, State);
         JobEntry(const JobEntry& jobEntry)= default;
         bool operator<(const JobEntry &jobEntry) const;
         friend ostream& operator<<( ostream& os,JobEntry& je);
@@ -210,7 +218,7 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd, bool isStopped = false,pid_t pid=0);
+    void addJob(Command* cmd,pid_t pid=0,State state=BgState);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -311,7 +319,7 @@ public:
     // TODO: add extra methods as needed
     char* GetLastPwd();
     void setLastPwd( char*& dir);
-    void addJob(Command* cmd,pid_t pid);
+    void addJob(Command* cmd,pid_t pid, State state);
 };
 
 ///==========================================================================================
