@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
             try {
                 smash.executeCommand(cmd_line.c_str());
             }
+            catch (EmptyCommandException){}
             catch (...){
                 break;
             }

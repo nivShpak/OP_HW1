@@ -24,6 +24,7 @@ using namespace std;
 class SmallShell;
 class Command;
 class JobsList;
+class EmptyCommandException : public exception {};
 ///==========================================================================================
 ///   Command
 class Command {
@@ -133,6 +134,19 @@ public:
     virtual ~QuitCommand() {}
     void execute() override;
 };
+
+///==========================================================================================
+///   CP
+
+class CpCommand : public BuiltInCommand {
+// TODO: Add your data members public:
+    Run run;
+public:
+    CpCommand(const char* cmd_line, SmallShell& smash);
+    virtual ~CpCommand() {};
+    void execute() override;
+};
+
 ///==========================================================================================
 ///   History not relevant
 class CommandsHistory {

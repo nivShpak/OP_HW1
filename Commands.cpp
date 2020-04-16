@@ -93,6 +93,10 @@ void _removeBackgroundSign(char* cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+
+
+
+
 // TODO: Add your implementation for classes in Commands.h
 
 ///==========================================================================================
@@ -117,6 +121,8 @@ const string SmallShell::getPrompt() const{
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 
+
+
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 
     // For example:
@@ -124,13 +130,16 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = string(cmd_line);
     char* command_args[COMMAND_MAX_ARGS+1];
     if(_parseCommandLine(cmd_line,command_args)==0){
-        return nullptr;//empty command
+        throw EmptyCommandException();//empty command
     }
     if(cmd_s.find(">")!=string::npos){
         if ((strcmp(command_args[1],">")==0)||(strcmp(command_args[1],">>")==0) ){
             return new RedirectionCommand(cmd_line,*this);
         }
     }
+    char built_in_cmd_line[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(built_in_cmd_line,cmd_line);
+    _removeBackgroundSign(built_in_cmd_line);
 
 
     if (strcmp(command_args[0],"pwd")==0) {
@@ -139,33 +148,32 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (strcmp(command_args[0],"cd")==0) {
         cmd_line=cmd_line;
         //char** platPwdp=&this->lastPwdSmash;
-        return new ChangeDirCommand(cmd_line,*this);
+        return new ChangeDirCommand(built_in_cmd_line,*this);
     }
     else if (strcmp(command_args[0],"chprompt")==0)  {
-      return new Chprompt(this,cmd_line);
+      return new Chprompt(this,built_in_cmd_line);
     }
     else if (strcmp(command_args[0],"showpid")==0) {
-       return new ShowPidCommand(cmd_line);
+       return new ShowPidCommand(built_in_cmd_line);
     }
     else if (strcmp(command_args[0],"jobs")==0) {
         if(jobsListSmash->GetMaxJobid()==0)
             return nullptr;
         jobsListSmash->sortAndDelete();
-        return new JobsCommand(cmd_line,jobsListSmash);
+        return new JobsCommand(built_in_cmd_line,jobsListSmash);
     }
     else if (strcmp(command_args[0],"kill")==0){
-        return new KillCommand(cmd_line, jobsListSmash);
+        return new KillCommand(built_in_cmd_line, jobsListSmash);
     }
     else if (strcmp(command_args[0],"fg")==0) {
-        return new ForegroundCommand(cmd_line,jobsListSmash);
+        return new ForegroundCommand(built_in_cmd_line,jobsListSmash);
     }
     else if (strcmp(command_args[0],"bg")==0) {
-        return new BackgroundCommand(cmd_line,jobsListSmash);
+        return new BackgroundCommand(built_in_cmd_line,jobsListSmash);
     }
     else if (strcmp(command_args[0],"quit")==0) {
-        return new QuitCommand(cmd_line,this->jobsListSmash);
+        return new QuitCommand(built_in_cmd_line,this->jobsListSmash);
     }
-
     else {
         return new ExternalCommand(cmd_line, *this); ///its refernce for command
     }
@@ -293,6 +301,7 @@ Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line)
     else {
         this->prompt = string(args[1])+=">";
     }
+    ///todo: delete _args
 }
 
 Chprompt::~Chprompt(){};
@@ -652,6 +661,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash) :Comma
 }
 
 void ExternalCommand::execute() {
+    int status;
     char cmd[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line);
     if (run==Back) _removeBackgroundSign(cmd);
@@ -663,7 +673,7 @@ void ExternalCommand::execute() {
     }
     if (pid>0) {
         if (this->run == Front){
-            wait(NULL);
+            waitpid(pid,&status,0);
         }else{
             this->cmd_smash->addJob(this);
         }
@@ -726,10 +736,21 @@ void RedirectionCommand::execute() {
 
 PipeCommand::PipeCommand(const char *cmdLine,SmallShell& smash) : Command(cmdLine,smash) {
 
-
 }
 
 void PipeCommand::execute() {
 
 
 }
+
+
+
+///==========================================================================================
+///   cp
+
+
+CpCommand::CpCommand(const char* cmd_line, SmallShell& smash) : BuiltInCommand(cmd_line,smash), run(Front){
+    if (_isBackgroundComamnd(cmd_line)) run = Back;
+}
+
+void CpCommand::execute() {};
