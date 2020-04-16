@@ -30,10 +30,11 @@ class EmptyCommandException : public exception {};
 class Command {
 // TODO: Add your data members
 protected:
-    const char *cmd_line;
+    string cmd_line;
     int num_of_arg;
     char* args[COMMAND_MAX_ARGS+1];
     SmallShell* cmd_smash;
+    unsigned int cmd_pid=0;
 public:
     Command(const char* cmd_line);
     Command(const char* cmd_line,SmallShell& smash);
@@ -43,6 +44,8 @@ public:
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
     string GetCmd_line();
+
+    unsigned int GetCmd_pid();
 };
 ///==========================================================================================
 ///   BuiltInCommand
@@ -65,9 +68,10 @@ public:
 ///   PipeCommand
 class PipeCommand : public Command {
     // TODO: Add your data members
+    bool firstOption;
 public:
     PipeCommand(const char* cmd_line);
-    explicit PipeCommand(const char *cmdLine,SmallShell& smash);
+    explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -75,9 +79,10 @@ public:
 ///   RedirectionCommand
 class RedirectionCommand : public Command {
     // TODO: Add your data members
+    bool firstOption;
 public:
     explicit RedirectionCommand(const char *cmdLine);
-    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash);
+    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst);
 
     virtual ~RedirectionCommand() {}
     void execute() override;
@@ -185,7 +190,7 @@ public:
         //JobEntry &operator==(const JobEntry &jobEntry);
         //JobEntry &operator!=(const JobEntry &jobEntry)= default;
         //JobEntry &operator++();
-        JobEntry(unsigned int jid,Command* command);
+        JobEntry(unsigned int jid,Command* command,pid_t pid);
         JobEntry(const JobEntry& jobEntry)= default;
         bool operator<(const JobEntry &jobEntry) const;
         friend ostream& operator<<( ostream& os,JobEntry& je);
@@ -205,7 +210,7 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, bool isStopped = false,pid_t pid=0);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -306,7 +311,7 @@ public:
     // TODO: add extra methods as needed
     char* GetLastPwd();
     void setLastPwd( char*& dir);
-    void addJob(Command* cmd);
+    void addJob(Command* cmd,pid_t pid);
 };
 
 ///==========================================================================================
