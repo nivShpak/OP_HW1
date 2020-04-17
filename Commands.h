@@ -38,7 +38,7 @@ class Command {
 protected:
     string cmd_line;
     int num_of_arg;
-    char* args[COMMAND_MAX_ARGS+1];
+    vector<string> args;
     SmallShell* cmd_smash;
     unsigned int cmd_pid=0;
     bool isRedPip;
@@ -299,7 +299,7 @@ class SmallShell {
 private:
     // TODO: Add your data members
     string prompt;
-    char* lastPwdSmash;
+    string lastPwdSmash;
     JobsList* jobsListSmash;
     vector<Command*> commandVectorSmash;
     SmallShell();
@@ -316,10 +316,11 @@ public:
         return instance;
     }
     ~SmallShell();
+    void DeleteAll();
     void executeCommand(const char* cmd_line, bool isRedPip=false);
     // TODO: add extra methods as needed
-    char* GetLastPwd();
-    void setLastPwd( char*& dir);
+    string GetLastPwd();
+    void setLastPwd( string dir);
     void addJob(Command* cmd,pid_t pid, State state);
 };
 
