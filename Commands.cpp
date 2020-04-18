@@ -18,7 +18,7 @@
 
 #define FAIL -1
 #define SUCCESS 0
-#define SPACE " "
+#define SPACE ' '
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -33,10 +33,25 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 #define FUNC_ENTRY()
 #define FUNC_EXIT()
 #endif
+__pid_t smash_pid = getpid();
 __pid_t front_pid = 0;
+__pid_t pipe_pid = 0;
+__pid_t pipe_pid_grp = 0;
 
+__pid_t getSmashPid (){
+    return smash_pid;
+}
+__pid_t getSmashPidGrp (){
+    return pipe_pid_grp;
+}
 __pid_t getFrontPid (){
     return front_pid;
+}
+__pid_t getPipePid (){
+    return pipe_pid;
+}
+__pid_t getPipePidGrp (){
+    return pipe_pid_grp;
 }
 #define DEBUG_PRINT cerr << "DEBUG: "
 
@@ -104,7 +119,7 @@ void _removeBackgroundSign(char* cmd_line) {
         return;
     }
     // replace the & (background sign) with space and then remove all tailing spaces.
-    cmd_line[idx] = 0;
+    cmd_line[idx] = ' ';
     // truncate the command line string up to the last non-space character
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
@@ -149,7 +164,7 @@ const string SmallShell::getPrompt() const{
 
 
 
-Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip=false) {
+Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr) {
 
     // For example:
     bool isFirst=true;
@@ -158,13 +173,20 @@ Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip=false) {
     if(_parseCommandLine(cmd_line,command_args)==0){
         throw EmptyCommandException();//empty command
     }
-    else if((cmd_s.find(" > ")!=string::npos)){
+    else if((cmd_s.find(">")!=string::npos) && cmd_s.find(">>") == string::npos){
         return new RedirectionCommand(cmd_line,*this,isFirst);
     }
-    else if((cmd_s.find(" >> ")!=string::npos)){
+    else if((cmd_s.find(">>")!=string::npos)){
         isFirst= false;
         return new RedirectionCommand(cmd_line,*this,isFirst);
 
+    }
+    else if((cmd_s.find("|")!=string::npos) && cmd_s.find("|&") == string::npos){
+        return new PipeCommand(cmd_line,*this,isFirst);
+    }
+    else if((cmd_s.find("|&")!=string::npos)){
+        isFirst= false;
+        return new PipeCommand(cmd_line,*this,isFirst);
     }
     char built_in_cmd_line[COMMAND_ARGS_MAX_LENGTH];
     strcpy(built_in_cmd_line,cmd_line);
@@ -173,19 +195,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip=false) {
     char command[COMMAND_ARGS_MAX_LENGTH] ;
     strcpy(command, command_args[0].c_str());
     _removeBackgroundSign(command);
-    if((cmd_s.find(" | ")!=string::npos)){
-        return new PipeCommand(cmd_line,*this,isFirst);
-    }
-    else if((cmd_s.find(" |& ")!=string::npos)){
-        isFirst= false;
-        return new PipeCommand(cmd_line,*this,isFirst);
-    }
-    else if (command_args[0]=="pwd") {
+
+    if (command_args[0]=="pwd") {
         return new GetCurrDirCommand(built_in_cmd_line);
     }
     else if (command_args[0]=="cd") {
-        cmd_line=cmd_line;
-        //char** platPwdp=&this->lastPwdSmash;
         return new ChangeDirCommand(built_in_cmd_line,*this);
     }
     else if (command_args[0]=="chprompt")  {
@@ -215,21 +229,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line,bool isRedPip=false) {
         return new CpCommand(built_in_cmd_line,*this, run);
     }
     else {
-        return new ExternalCommand(cmd_line, *this,isRedPip); ///its refernce for command
+        return new ExternalCommand(cmd_line, *this,redPipOther,realCmd); ///its refernce for command
     }
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line,bool isRedPipConst) {
+void SmallShell::executeCommand(const char *cmd_line,RedPipOther redPipConst, Command* realCmd) {
     // TODO: Add your implementation here
-    //for example:
-    Command* cmd = CreateCommand(cmd_line,isRedPipConst);
+    Command* cmd = CreateCommand(cmd_line,redPipConst,realCmd);
 
     if (cmd==NULL)
         throw SmallShellException(); //todo: maybe error
     this->commandVectorSmash.push_back(cmd);//so we can delete all cmds at the end of program;
     cmd->execute();
-    //delete cmd;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -246,8 +258,8 @@ void SmallShell::setLastPwd(string dir) {
     lastPwdSmash = dir;
 }
 
-void SmallShell::addJob(Command *cmd,pid_t pid, State state = BgState) {
-    this->jobsListSmash->addJob(cmd,pid, state);
+void SmallShell::addJob(Command *cmd,pid_t pid, State state = BgState,RedPipOther redPipOther) {
+    this->jobsListSmash->addJob(cmd,pid, state,redPipOther);
 }
 
 
@@ -261,7 +273,6 @@ Command::Command(const char* cmd_lineCons):cmd_line(cmd_lineCons) {
 
 Command::Command(const char *cmd_lineCons, SmallShell &smash): cmd_line(cmd_lineCons) {
     this->num_of_arg = _parseCommandLine(cmd_lineCons,this->args);
-
     cmd_smash=&smash;
     cmd_pid=getpid();
 }
@@ -375,7 +386,7 @@ void Chprompt::execute() {
 ///      ShowpidCommand
 
 void ShowPidCommand::execute(){
-    cout<<"smash pid is " << getpid() <<endl;
+    cout<<"smash pid is " << getSmashPid() <<endl;
 }
 
 ///==========================================================================================
@@ -441,7 +452,7 @@ void QuitCommand::execute() {
 ///==========================================================================================
 ///      FgBgCheck
   
-unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsigned int* jobId){
+unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsigned int* jobId,RedPipOther* redPipOther){
     jobs->removeFinishedJobs();
     bool isFg=true;
     if(strcmp(s,"bg")==0)
@@ -482,6 +493,7 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsig
     JobsList::JobEntry* job=jobs->getJobById(jid);
 
     (*jobId)=job->GetJobId();
+    (*redPipOther)=job->GetRedPipOther();
 
     if(*jobId== 0) {
         cout << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
@@ -510,29 +522,63 @@ ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs) : Buil
 void ForegroundCommand::execute() {
     unsigned int jPid=0;
     unsigned int jid;
-    JobsList::JobEntry** job= nullptr;
+    RedPipOther redPipOther;
+
     try{
-        jPid=FgBgCheck(args,jobsList_fgCommand,"fg",&jid);
+        jPid=FgBgCheck(args,jobsList_fgCommand,"fg",&jid,&redPipOther);
     }
     catch(FgBgException& e){
         return;
     }
-    int checkKill=kill(jPid, SIGCONT);
-    int wstatus;
-    if(checkKill==SUCCESS){
-        front_pid = jPid;
-        waitpid(jPid,&wstatus,WUNTRACED);
-        if(WIFSTOPPED(wstatus)){
-            //this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
-            this->jobsList_fgCommand->getJobById(jid)->SetJobState(StoppedState);
-            this->jobsList_fgCommand->getJobById(jid)->zeroJobStart();
+    /*if(redPipOther==PipCmd){
+        pipe_pid=jPid;
+        pipe_pid_grp=getpgid(jPid);
+        pid_t grpPid=pipe_pid_grp;
+        if(signal(SIGTSTP , ctrlZHandlerPipe)==SIG_ERR) {
+            perror("smash error: failed to set ctrl-Z handler");
         }
-        else {
-            jobsList_fgCommand->removeJobById(jid);//what happend when ctrl z send?
-            jobsList_fgCommand->sortOnly();
+        if(signal(SIGINT , ctrlCHandlerPipe)==SIG_ERR) {
+            perror("smash error: failed to set ctrl-C handler");
         }
-        front_pid = 0;
-    }
+        int checKill = killpg(grpPid, SIGCONT);
+        int wstatus;
+        if (checKill == SUCCESS) {
+            front_pid = jPid;
+            waitpid(jPid, &wstatus, WUNTRACED);
+            if (WIFSTOPPED(wstatus)) {
+                //this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
+                this->jobsList_fgCommand->getJobById(jid)->SetJobState(StoppedState);
+                this->jobsList_fgCommand->getJobById(jid)->zeroJobStart();
+            } else {
+                jobsList_fgCommand->removeJobById(jid);
+                jobsList_fgCommand->sortOnly();
+            }
+            front_pid = 0;
+        }
+        if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
+            perror("smash error: failed to set ctrl-Z handler");
+        }
+        if(signal(SIGINT , ctrlCHandler)==SIG_ERR) {
+            perror("smash error: failed to set ctrl-C handler");
+        }
+    } else {*/
+        int checkKill = kill(jPid, SIGCONT);
+        int wstatus;
+        if (checkKill == SUCCESS) {
+            front_pid = jPid;
+            waitpid(jPid, &wstatus, WUNTRACED);
+            if (WIFSTOPPED(wstatus)) {
+                //this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
+                this->jobsList_fgCommand->getJobById(jid)->SetJobState(StoppedState);
+                this->jobsList_fgCommand->getJobById(jid)->zeroJobStart();
+            } else {
+                jobsList_fgCommand->removeJobById(jid);//what happend when ctrl z send?
+                jobsList_fgCommand->sortOnly();
+            }
+            front_pid = 0;
+        } else
+            perror("smash error: kill failed");
+    //}
 
 
 
@@ -547,18 +593,43 @@ BackgroundCommand::BackgroundCommand(const char *cmdLine, JobsList* jobs) : Buil
 void BackgroundCommand::execute() {
     unsigned int jPid=0;
     unsigned int jid;
-    JobsList::JobEntry* job;
+    RedPipOther redPipOther;
+
     try{
-        jPid=FgBgCheck(args,jobsList_bgCommand,"bg",&jid);
+        jPid=FgBgCheck(args,jobsList_bgCommand,"bg",&jid,&redPipOther);
     }
     catch(FgBgException& e){
         return;
     }
     jobsList_bgCommand->getJobById(jid)->SetJobState(BgState);
-    int checkKill=kill(jPid, SIGCONT);
-    //if(checkKill==SUCCESS)
-    //maybe we want wstatus?
-    //jobsList_bgCommand->removeJobById(jid);
+   /* if(redPipOther==PipCmd) {
+        pipe_pid = jPid;
+        pipe_pid_grp = getpgid(jPid);
+        pid_t grpPid = pipe_pid_grp;
+        if (signal(SIGTSTP, ctrlZHandlerPipe) == SIG_ERR) {
+            perror("smash error: failed to set ctrl-Z handler");
+        }
+        if (signal(SIGINT, ctrlCHandlerPipe) == SIG_ERR) {
+            perror("smash error: failed to set ctrl-C handler");
+        }
+        int checkill = killpg(grpPid, SIGCONT);
+        if(checkill==FAIL)
+            perror("smash error: kill failed");
+        if (signal(SIGTSTP, ctrlZHandler) == SIG_ERR) {
+            perror("smash error: failed to set ctrl-Z handler");
+        }
+        if (signal(SIGINT, ctrlCHandler) == SIG_ERR) {
+            perror("smash error: failed to set ctrl-C handler");
+        }
+
+    } else{*/
+        int checkill=kill(jPid, SIGCONT);
+        //should we zero the time?
+        if(checkill==FAIL)
+            perror("smash error: kill failed");
+    //}
+
+
 
 }
       
@@ -581,7 +652,7 @@ bool is_pid_running(pid_t pid) {
         // Wait for defunct....
     }
 
-    if (0 == kill(pid, 0))
+    if (kill(pid, 0)==0)
         return 1; // Process exists
 
     return 0;
@@ -590,10 +661,8 @@ JobsList::JobsList():maxJobId(0) {
 }
 
 void JobsList::removeFinishedJobs() {
-    //bool isPidRuning;
     int size = jobsVector.size();
-    for (int i = 0; i < size; ++i) {
-        //isPidRuning=is_pid_running(jobsVector[i].GetJobPid());
+    for (int i = 0; i < size;) {
         if (jobsVector[i].GetJobState()==FinishState||!is_pid_running(jobsVector[i].GetJobPid())) {
             if (maxJobId <= jobsVector[i].GetJobId()) {
                 if(size==1){
@@ -604,8 +673,9 @@ void JobsList::removeFinishedJobs() {
 
             }
             jobsVector.erase(jobsVector.begin()+i);
-            size--;
-        }
+            --size;
+        } else
+            ++i;
 
     }
 
@@ -667,9 +737,9 @@ void JobsList::killAllJobs() {
     }
 }
       
-void JobsList::addJob(Command *cmd, pid_t pid, State state) {
+void JobsList::addJob(Command *cmd, pid_t pid, State state,RedPipOther isRedPipeOther) {
     this->removeFinishedJobs();
-    jobsVector.push_back(JobEntry(maxJobId+1,cmd,pid,state));
+    jobsVector.push_back(JobEntry(maxJobId+1,cmd,pid,state,isRedPipeOther));
     maxJobId++;
 }
       
@@ -714,17 +784,22 @@ JobsList::JobEntry *JobsList::getLastStoppedJob(int *jobId) {
 ///==========================================================================================
 ///   job entry
       
-JobsList::JobEntry::JobEntry(unsigned int jid, Command* command,pid_t pid, State state):jobId(jid),commandJob(command) {
+JobsList::JobEntry::JobEntry(unsigned int jid, Command* command,pid_t pid, State state ,RedPipOther isRedPipeOtherConst=OtherCmd):jobId(jid),commandJob(command) {
     jobStart=time(nullptr);
     jobPid=pid;
     jobState=state;
+    isRedPipeOther=isRedPipeOtherConst;
 
 }
 bool JobsList::JobEntry::operator<(const JobsList::JobEntry &jobEntry) const {
     return this->jobId<jobEntry.jobId;
 }
 
-
+RedPipOther JobsList::JobEntry::GetRedPipOther() {
+    if(this== nullptr)
+        return OtherCmd;
+    return isRedPipeOther;
+}
 unsigned int JobsList::JobEntry::GetJobId() {
     if(this== nullptr)
         return 0;
@@ -783,7 +858,7 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
     State je_State=je.GetJobState();
     string s;
     if(je_State==StoppedState){
-        s=" (stooped)\n";
+        s=" (stopped)\n";
     } else
         s="\n";
     os<<"["<<je.GetJobId()<<"]"<<SPACE<<je.GetJobCmdLine()<<" : "<<je.GetJobPid()<<SPACE<<je.GetJobElapsed()<<" secs"<<s;
@@ -793,9 +868,10 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
 ///==========================================================================================
 ///   External
 
-ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,bool isRedPipConst) :Command(cmd_line,smash) {
+ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr) :Command(cmd_line,smash) {
     //this->cmd_smash = smash; its in Command constractur
-    this->isRedPip=isRedPipConst;
+    this->isRedPipeOther=redPipConst;
+    this->realCmd=realCmdConst;
     this->num_of_arg = _parseCommandLine(cmd_line, this->args);
     if (_isBackgroundComamnd(cmd_line)) this->run = Back;
     else this->run = Front;
@@ -813,21 +889,29 @@ void ExternalCommand::execute() {
         perror("smash error: fork failed");
     }
     if (pid>0) {//father=smash
+        if(isRedPipeOther!=OtherCmd){
+            wait(NULL);
+        }
         if (this->run == Front){
             front_pid = pid;
             waitpid(pid,&status,WUNTRACED);
-            if(WIFSTOPPED(status)){
-                this->cmd_smash->addJob(this,pid,StoppedState);
+            if(WIFSTOPPED(status)) {
+                if (isRedPipeOther != OtherCmd) {//its from red or pipe
+                    //kill(SIGCONT,smash_pid);//maybe we need the same signal
+                    this->cmd_smash->addJob(this, pid, StoppedState);
+                }
+                    else
+                        this->cmd_smash->addJob(this,pid,StoppedState);
             }
             front_pid = 0;
-        }else{//this is smash pid
-            if(!isRedPip)
+        }else{//this is smash pid backround
+                this->cmd_smash->addJob(this,pid,BgState);
 
-                this->cmd_smash->addJob(this,pid);
         }
     }
     else {//son
-        setpgrp(); // we have to do it for the son
+        if(isRedPipeOther==OtherCmd) //pipe dosent change pgrd
+            setpgrp(); // we have to do it for the son
         execv(_args[0],_args);
         perror("smash error: execv failed");
         exit(0);
@@ -844,73 +928,114 @@ RedirectionCommand::RedirectionCommand(const char *cmdLine,SmallShell& smash,boo
 }
 
 void RedirectionCommand::execute() {
-    string fullCmd_line=(string)cmd_line;
+    string fullCmd_line = (string) cmd_line;
     string cmdLine1;
     string cmdLine2;
-    int bufStart=0;
-    int bufEnd=0;
-    if(firstOption){
-        bufStart=fullCmd_line.find(" > ");
-        bufEnd=bufStart+3;
-    } else{
-        bufStart=fullCmd_line.find(" >> ");
-        bufEnd=bufStart+4;
+    int bufStart = 0;
+    int bufEnd = 0;
+    bool isBack = _isBackgroundComamnd(fullCmd_line.c_str());
+    _removeBackgroundSign((char *) fullCmd_line.c_str());
+    if (firstOption) {
+        bufStart = fullCmd_line.find(">");
+        bufEnd = bufStart + 1;
+    } else {
+        bufStart = fullCmd_line.find(">>");
+        bufEnd = bufStart + 2;
     }
+    cmdLine1 = fullCmd_line.substr(0, bufStart);
+    cmdLine2 = fullCmd_line.substr(bufEnd);
+    _trim(cmdLine1);
+    _trim(cmdLine2);
+    if (isBack) {
 
-    cmdLine1=fullCmd_line.substr(0,bufStart+1);
-    cmdLine2=fullCmd_line.substr(bufEnd);
-    _removeBackgroundSign((char*)cmdLine2.c_str());
-    //pid_t p = fork();
-
-    if(_isBackgroundComamnd(cmd_line.c_str())){
         cmdLine1.push_back('&');
     }
     int n1 = cmdLine1.length();
-    // declaring character array
     char charCmdLine1[n1 + 1];
     int n2 = cmdLine2.length();
-    // declaring character array
     char charCmdLine2[n2 + 1];
     strcpy(charCmdLine1, cmdLine1.c_str());
     strcpy(charCmdLine2, cmdLine2.c_str());
 
 
+    int p = fork();
+    if (p < 0)
+        perror("smash error: fork failed");
+    if (p == 0) {//child proc
+        setpgrp();
+        int fd1 = dup(1);
+        if (fd1 == FAIL) {
+            perror("smash error: dup failed");
+            cmd_smash->DeleteAll();
+            exit(0);
+        }
 
-    int fd1=dup(1);
-    if(fd1==FAIL){
-        //exeption
+        if (close(1) == FAIL) {
+            perror("smash error: close failed");//closes stdout
+            cmd_smash->DeleteAll();
+            exit(0);
+        }
+        int fd;
+        mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+        char *filename = charCmdLine2;
+        if (firstOption) {
+            fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);//stdout to file
+            if (fd == FAIL) {
+                perror("smash error: open failed");//closes stdout
+                cmd_smash->DeleteAll();
+                exit(0);
+            }
+
+        } else {
+            fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, mode);//stdout to file
+            if (fd == FAIL) {
+                perror("smash error: open failed");//closes stdout
+                cmd_smash->DeleteAll();
+                exit(0);
+            }
+        }
+
+        try {
+            cmd_smash->executeCommand(charCmdLine1, RedCmd, this);//open file no matter
+
+
+
+        }
+        catch (SmallShellException &e) {
+            int checkDelete = remove(filename);//if the cmd is illigal delete file, but if it opend befor?
+            if (checkDelete == FAIL) {
+                close(fd);
+                dup2(fd1, 1);
+                perror("smash error: remove failed");//closes stdout
+            }
+        }
+        if (close(fd) == FAIL) {
+            perror("smash error: close failed");
+        }
+        int fd2 = dup2(fd1, 1); //stdout back to screen
+        if (fd2 == FAIL) {
+            perror("smash error: dup2 failed");
+
+        }
+        cmd_smash->DeleteAll();
+        exit(0);
+    } else {//smash proc
+        if(!isBack) {
+            int status;
+            front_pid = p;
+            waitpid(p, &status, WUNTRACED);
+            if (WIFSTOPPED(status)) {
+                this->cmd_smash->addJob(this, p, StoppedState, RedCmd);
+            }
+            front_pid = 0;
+        }else
+            this->cmd_smash->addJob(this, p, BgState, RedCmd);
+
+
     }
-
-    close(1); //closes stdout
-
-    int fd;
-    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    char *filename =charCmdLine2;
-    if(firstOption){
-        fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, mode);
-
-    } else{
-        fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
-    }
-
-    try{
-        cmd_smash->executeCommand(charCmdLine1,true);//open file no matter
-
-
-    }
-    catch(SmallShellException& e){
-        int checkDelete=remove(filename);//if the cmd is illigal delete file, but if it opend befor?
-    }
-
-    close(fd);
-    int fd2=dup2(fd1,1); //stdout back to screen
-    if(fd2==FAIL){
-        //exeption
-    }
-
-
-
 }
+
+
 ///==========================================================================================
 ///   RedirectionCommand
 
@@ -926,19 +1051,21 @@ void PipeCommand::execute() {
     string cmdLine2;
     int bufStart=0;
     int bufEnd=0;
+    bool isBack=_isBackgroundComamnd(fullCmd_line.c_str());
+    _removeBackgroundSign((char*)fullCmd_line.c_str());
     if(firstOption){
-        bufStart=fullCmd_line.find(" | ");
-        bufEnd=bufStart+3;
+        bufStart=fullCmd_line.find("|");
+        bufEnd=bufStart+1;
     } else{
-        bufStart=fullCmd_line.find(" |& ");
-        bufEnd=bufStart+4;
+        bufStart=fullCmd_line.find("|&");
+        bufEnd=bufStart+2;
     }
-
-    cmdLine1=fullCmd_line.substr(0,bufStart+1);
+    cmdLine1=fullCmd_line.substr(0,bufStart);
     cmdLine2=fullCmd_line.substr(bufEnd);
-    //pid_t p = fork();
+    _trim(cmdLine1);
+    _trim(cmdLine2);
+    if(isBack){
 
-    if(_isBackgroundComamnd(cmd_line.c_str())){
         cmdLine1.push_back('&');
         cmdLine2.push_back('&');
     }
@@ -948,71 +1075,77 @@ void PipeCommand::execute() {
         perror("smash error: fork failed");
     if(p0==0) {//pipe process
         setpgrp();
-
-
         int fd[2];
         pipe(fd);
         pid_t p1 = fork();
         if (p1 == 0) {// first child
-            setpgrp();
-
+            //setpgrp();
             if (firstOption) {
-                //close(1);
-                //dup(fd[1]);
                 dup2(fd[1], 1);
-
             }
             if (!firstOption) {
-                //close(2);
-                //dup(fd[1]);
                 dup2(fd[1], 2);
 
             }
-
             close(fd[0]);
             close(fd[1]);
-            cmd_smash->executeCommand(cmdLine1.c_str(), true);
-
-
-
+            cmd_smash->executeCommand(cmdLine1.c_str(), PipCmd,this);
             exit(0);
         }
         if (p1 < 0) {
             perror("smash error: fork failed");
         }
         if(p1>0) {//pipe process
+            //wait(NULL);
+            front_pid=p1;
+            waitpid(p1,&status,WUNTRACED);///we should wait to output?
+            if(WIFSTOPPED(status)){
+               // kill(SIGCONT,smash_pid);
+            }
+            front_pid = 0;
 
-            //waitpid(p1,&status,0);
             pid_t p2 = fork();
             if (p2 == 0) {// second child
-                setpgrp();
-                //close(0);
-                //dup(fd[0]);
+                //setpgrp();
                 dup2(fd[0], 0);
                 close(fd[0]);
                 close(fd[1]);
-                cmd_smash->executeCommand(cmdLine2.c_str(), true);
-
+                cmd_smash->executeCommand(cmdLine2.c_str(), PipCmd,this);
                 exit(0);
             }
             if (p2 < 0) {//pid not good
                 perror("smash error: fork failed");
             }
             if(p2>0) { //pipe process
+                //wait(NULL);
+                front_pid=p2;
+                waitpid(p2,&status,WUNTRACED);///we should wait to output?
+                if(WIFSTOPPED(status)){
+                    //kill(SIGCONT,smash_pid);
+                }
+                front_pid = 0;
                 close(fd[0]);
                 close(fd[1]);
-                //waitpid(p2,&status,0);
 
             }
         }
         exit(0);
-
     }
     else{
         //smash process
-        //waitpid(p0,&status,0);
-        this->cmd_smash->addJob(this,p0);
+        if(!isBack) {
+            front_pid=p0;
+            waitpid(p0, &status, WUNTRACED);
+            if(WIFSTOPPED(status)){
+                this->cmd_smash->addJob(this,p0,StoppedState,PipCmd);
+            }
+            front_pid = 0;
+        }
+        else
+            this->cmd_smash->addJob(this,p0,BgState,PipCmd);
     }
+
+
 
 }
 
@@ -1029,72 +1162,74 @@ void CpCommand::execute() {
     pid_t pid = fork();
     int status;
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    if (pid<0){
+    if (pid < 0) {
         perror("smash error: fork failed");
-    }
-    else if (pid>0) {
-        if (this->run == Front){
+    } else if (pid > 0) {
+        if (this->run == Front) {
             front_pid = pid;
-            waitpid(pid,&status,WUNTRACED);
-            if(WIFSTOPPED(status)){
-                this->cmd_smash->addJob(this,pid,StoppedState);
+            waitpid(pid, &status, WUNTRACED);
+            if (WIFSTOPPED(status)) {
+                this->cmd_smash->addJob(this, pid, StoppedState);
             }
             front_pid = 0;
+        } else {
+            this->cmd_smash->addJob(this, pid);
         }
-        else{
-            this->cmd_smash->addJob(this,pid);
-        }
-    }
-    else {
+    } else {
         if (this->num_of_arg != 3) {
             ///invalid num of args
-            exit(0);
-        }
-        src = open(args[1].c_str(), O_RDONLY);
-        if (src == FAIL) {
-            perror("smash error: open failed");
-            exit(0);
-        }
-        dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-        if (dst == FAIL) {
+
+            setpgrp();
+            if (this->num_of_arg != 3) {
+                ///invalid num of arg
+                exit(0);
+            }
+            src = open(args[1].c_str(), O_RDONLY);
+            if (src == FAIL) {
+                perror("smash error: open failed");
+                exit(0);
+            }
+            dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+            if (dst == FAIL) {
+                if (close(src) == FAIL)
+                    perror("smash error: close failed");
+                perror("smash error: open failed");
+                exit(0);
+            }
+            char buff[30];
+            int read_count = 1;
+            while (read_count) {
+                read_count = read(src, (void *) buff, 30);
+                if (read_count == FAIL) {
+                    if (close(src) == FAIL) {
+                        perror("smash error: close failed");
+                    }
+                    if (close(dst) == FAIL) {
+                        perror("smash error: close failed");
+                    }
+                    perror("smash error: read failed");
+                    exit(0);
+                }
+                if (write(dst, (void *) buff, read_count) == FAIL) {
+                    if (close(src) == FAIL) {
+                        perror("smash error: close failed");
+                    }
+                    if (close(dst) == FAIL) {
+                        perror("smash error: close failed");
+                    }
+                    perror("smash error: read failed");
+                    exit(0);
+                }
+            }
+            if (close(dst) == FAIL)
+                perror("smash error: close failed");
             if (close(src) == FAIL)
                 perror("smash error: close failed");
-            perror("smash error: open failed");
+            cout << "smash: " << args[1] << " was copied to " << args[2] << endl;
+            ///throw string("kill son");
+            ///delete cmd_smash;
+            cmd_smash->DeleteAll();
             exit(0);
         }
-        char buff[30];
-        int read_count = 1;
-        while (read_count) {
-            read_count = read(src, (void *) buff, 30);
-            if (read_count == FAIL) {
-                if (close(src) == FAIL) {
-                    perror("smash error: close failed");
-                }
-                if (close(dst) == FAIL) {
-                    perror("smash error: close failed");
-                }
-                perror("smash error: read failed");
-                exit(0);
-            }
-            if (write(dst, (void *) buff, read_count) == FAIL) {
-                if (close(src) == FAIL) {
-                    perror("smash error: close failed");
-                }
-                if (close(dst) == FAIL) {
-                    perror("smash error: close failed");
-                }
-                perror("smash error: read failed");
-                exit(0);
-            }
-        }
-        if (close(dst) == FAIL)
-            perror("smash error: close failed");
-        if (close(src)== FAIL)
-            perror("smash error: close failed");
-        cout<<"smash: " << args[1]<<" was copied to "<< args[2]<<endl;
-        ///throw string("kill son");
-        ///delete cmd_smash;
-        cmd_smash->DeleteAll();
-        exit(0);
     }
-};
+}

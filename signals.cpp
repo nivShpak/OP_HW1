@@ -27,7 +27,29 @@ void ctrlCHandler(int sig_num) {
         cout<<"smash: process "<< front_pid <<" was killed"<<endl;
     }
 }
+/*
+void ctrlZHandlerPipe(int sig_num) {
+    // TODO: Add your implementation
+    cout<<"smash: got ctrl-Z"<<endl;
+    __pid_t pipe_pid = getPipePid();
+    if (pipe_pid!=0) {
+        kill(pipe_pid,SIGSTOP);
+        kill(getFrontPid(),SIGSTOP);
+        killpg(getPipePidGrp(), SIGSTOP);
+        cout<<"smash: process "<< pipe_pid <<" was stoped"<<endl;
+    }
+}
 
+void ctrlCHandlerPipe(int sig_num) {
+    // TODO: Add your implementation
+    cout<<"smash: got ctrl-C"<<endl;
+    __pid_t pipe_pid = getPipePid();
+    if (pipe_pid!=0) {
+        killpg(getPipePidGrp(), SIGKILL);
+        cout<<"smash: process "<< pipe_pid <<" was killed"<<endl;
+    }
+}
+*/
 
 void alarmHandler(int sig_num) {
   // TODO: Add your implementation

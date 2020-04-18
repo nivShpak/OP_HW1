@@ -11,6 +11,9 @@ void ctrlCHandler(int sig_num);
 void alarmHandler(int sig_num);
 
 
+void ctrlZHandlerPipe(int sig_num);
+void ctrlCHandlerPipe(int sig_num);
+void alarmHandlerPipe(int sig_num);
 
 
 

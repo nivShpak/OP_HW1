@@ -19,6 +19,12 @@ enum Run{
     Front,
     Back
 };
+enum RedPipOther
+{
+    RedCmd,
+    PipCmd,
+    OtherCmd
+};
 
 using namespace std;
 
@@ -31,6 +37,10 @@ class JobsList;
 class JobsList;
 class EmptyCommandException : public exception {};
 __pid_t getFrontPid ();
+__pid_t getPipePid ();
+__pid_t getSmashPid ();
+__pid_t getPipePidGrp ();
+
 ///==========================================================================================
 ///   Command
 class Command {
@@ -41,7 +51,6 @@ protected:
     vector<string> args;
     SmallShell* cmd_smash;
     unsigned int cmd_pid=0;
-    bool isRedPip;
 public:
     Command(const char* cmd_line);
     Command(const char* cmd_line,SmallShell& smash);
@@ -66,8 +75,10 @@ public:
 ///   ExternalCommand
 class ExternalCommand : public Command {
     Run run = Front;
+    RedPipOther isRedPipeOther;
+    Command* realCmd;
 public:
-    ExternalCommand(const char* cmd_line,SmallShell& smash,bool);
+    ExternalCommand(const char* cmd_line,SmallShell& smash,RedPipOther isRedPipe,Command* realCmd);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -195,14 +206,16 @@ public:
         time_t jobStart;
         unsigned int jobPid;
         State jobState;
+        RedPipOther isRedPipeOther;
     public:
         //JobEntry &operator==(const JobEntry &jobEntry);
         //JobEntry &operator!=(const JobEntry &jobEntry)= default;
         //JobEntry &operator++();
-        JobEntry(unsigned int jid,Command* command,pid_t pid, State);
+        JobEntry(unsigned int jid,Command* command,pid_t pid, State state,RedPipOther isRedPipeOther);
         JobEntry(const JobEntry& jobEntry)= default;
         bool operator<(const JobEntry &jobEntry) const;
         friend ostream& operator<<( ostream& os,JobEntry& je);
+        RedPipOther GetRedPipOther();
         unsigned int GetJobId();
         unsigned int GetJobPid();
         double GetJobElapsed();
@@ -219,7 +232,7 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd,pid_t pid=0,State state=BgState);
+    void addJob(Command* cmd,pid_t pid=0,State state=BgState,RedPipOther isRedPipeOther=OtherCmd);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -234,6 +247,7 @@ public:
     unsigned int GetPidByJid(unsigned int Jid);
     unsigned int GetMaxJobid();
     void SetMaxJobid(unsigned int new_maxid);
+
 };
 ///==========================================================================================
 ///   JobsCommand
@@ -306,7 +320,7 @@ private:
 public:
     const string getPrompt()const;
     void setPrompt(string new_prompt);
-    Command *CreateCommand(const char* cmd_line,bool isRedPip);
+    Command *CreateCommand(const char* cmd_line,RedPipOther redPipOther,Command* realCmd);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton
@@ -317,11 +331,11 @@ public:
     }
     ~SmallShell();
     void DeleteAll();
-    void executeCommand(const char* cmd_line, bool isRedPip=false);
+    void executeCommand(const char* cmd_line, RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr);
     // TODO: add extra methods as needed
     string GetLastPwd();
     void setLastPwd( string dir);
-    void addJob(Command* cmd,pid_t pid, State state);
+    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther=OtherCmd);
 };
 
 ///==========================================================================================
