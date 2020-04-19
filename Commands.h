@@ -166,8 +166,10 @@ class CpCommand : public BuiltInCommand {
     int src;
     int dst;
     Run run;
+    RedPipOther isRedPipeOther;
+    Command* realCmd;
 public:
-    CpCommand(const char* cmd_line, SmallShell& smash, Run run);
+    CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst= OtherCmd,Command* realCmdConst= nullptr);
     virtual ~CpCommand() {};
     void execute() override;
 };
@@ -232,7 +234,7 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd,pid_t pid=0,State state=BgState,RedPipOther isRedPipeOther=OtherCmd);
+    void addJob(Command* cmd,pid_t pid=0,State state=BgState,RedPipOther isRedPipeOther=OtherCmd,Command* realCmd=nullptr);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -335,7 +337,7 @@ public:
     // TODO: add extra methods as needed
     string GetLastPwd();
     void setLastPwd( string dir);
-    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther=OtherCmd);
+    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr);
 };
 
 ///==========================================================================================
