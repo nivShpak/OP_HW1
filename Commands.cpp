@@ -115,6 +115,7 @@ void _removeBackgroundSign(char* cmd_line) {
         return;
     }
     // if the command line does not end with & then return
+
     if (cmd_line[idx] != '&') {
         return;
     }
@@ -163,17 +164,32 @@ const string SmallShell::getPrompt() const{
 */
 
 
+bool emptyCommand(const char* cmd){
+    int len = strlen(cmd);
+    for(int i=0 ; i<len ; ++i){
+        if (cmd[i]!=' ')
+            return false;
+    }
+    return true;
+}
+
+
 
 Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr) {
 
     // For example:
+
+    if(emptyCommand(cmd_line)){
+        throw EmptyCommandException();//empty command
+    }
     bool isFirst=true;
     string cmd_s = string(cmd_line);
     vector<string> command_args;
-    if(_parseCommandLine(cmd_line,command_args)==0){
-        throw EmptyCommandException();//empty command
-    }
-    else if((cmd_s.find(">")!=string::npos) && cmd_s.find(">>") == string::npos){
+    char built_in_cmd_line[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(built_in_cmd_line,cmd_line);
+    _removeBackgroundSign(built_in_cmd_line);
+    _parseCommandLine(built_in_cmd_line,command_args);
+    if((cmd_s.find(">")!=string::npos) && cmd_s.find(">>") == string::npos){
         return new RedirectionCommand(cmd_line,*this,isFirst);
     }
     else if((cmd_s.find(">>")!=string::npos)){
@@ -188,13 +204,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther
         isFirst= false;
         return new PipeCommand(cmd_line,*this,isFirst);
     }
-    char built_in_cmd_line[COMMAND_ARGS_MAX_LENGTH];
-    strcpy(built_in_cmd_line,cmd_line);
-    _removeBackgroundSign(built_in_cmd_line);
-    _removeBackgroundSign((char*)command_args[0].c_str());
-    char command[COMMAND_ARGS_MAX_LENGTH] ;
-    strcpy(command, command_args[0].c_str());
-    _removeBackgroundSign(command);
 
     if (command_args[0]=="pwd") {
         return new GetCurrDirCommand(built_in_cmd_line);
@@ -370,7 +379,7 @@ void ChangeDirCommand::execute() {
 Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line) {
     this->cmd_smash = s;
     if (this->num_of_arg==1)
-        this->prompt ="smash>";
+        this->prompt ="smash> ";
     else {
         this->prompt = string(args[1])+=">";
     }
@@ -1178,58 +1187,54 @@ void CpCommand::execute() {
     } else {
         if (this->num_of_arg != 3) {
             ///invalid num of args
-
             setpgrp();
-            if (this->num_of_arg != 3) {
-                ///invalid num of arg
-                exit(0);
-            }
-            src = open(args[1].c_str(), O_RDONLY);
-            if (src == FAIL) {
-                perror("smash error: open failed");
-                exit(0);
-            }
-            dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-            if (dst == FAIL) {
-                if (close(src) == FAIL)
-                    perror("smash error: close failed");
-                perror("smash error: open failed");
-                exit(0);
-            }
-            char buff[30];
-            int read_count = 1;
-            while (read_count) {
-                read_count = read(src, (void *) buff, 30);
-                if (read_count == FAIL) {
-                    if (close(src) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    if (close(dst) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    perror("smash error: read failed");
-                    exit(0);
-                }
-                if (write(dst, (void *) buff, read_count) == FAIL) {
-                    if (close(src) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    if (close(dst) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    perror("smash error: read failed");
-                    exit(0);
-                }
-            }
-            if (close(dst) == FAIL)
-                perror("smash error: close failed");
-            if (close(src) == FAIL)
-                perror("smash error: close failed");
-            cout << "smash: " << args[1] << " was copied to " << args[2] << endl;
-            ///throw string("kill son");
-            ///delete cmd_smash;
-            cmd_smash->DeleteAll();
             exit(0);
         }
+        src = open(args[1].c_str(), O_RDONLY);
+        if (src == FAIL) {
+            perror("smash error: open failed");
+            exit(0);
+        }
+        dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+        if (dst == FAIL) {
+            if (close(src) == FAIL)
+                perror("smash error: close failed");
+            perror("smash error: open failed");
+            exit(0);
+        }
+        char buff[30];
+        int read_count = 1;
+        while (read_count) {
+            read_count = read(src, (void *) buff, 30);
+            if (read_count == FAIL) {
+                if (close(src) == FAIL) {
+                    perror("smash error: close failed");
+                }
+                if (close(dst) == FAIL) {
+                    perror("smash error: close failed");
+                }
+                perror("smash error: read failed");
+                exit(0);
+            }
+            if (write(dst, (void *) buff, read_count) == FAIL) {
+                if (close(src) == FAIL) {
+                    perror("smash error: close failed");
+                }
+                if (close(dst) == FAIL) {
+                    perror("smash error: close failed");
+                }
+                perror("smash error: read failed");
+                exit(0);
+            }
+        }
+        if (close(dst) == FAIL)
+            perror("smash error: close failed");
+        if (close(src) == FAIL)
+            perror("smash error: close failed");
+        cout << "smash: " << args[1] << " was copied to " << args[2] << endl;
+        ///throw string("kill son");
+        ///delete cmd_smash;
+        cmd_smash->DeleteAll();
+        exit(0);
     }
 }
