@@ -1159,7 +1159,7 @@ void PipeCommand::execute() {
             front_pid = 0;
         }
         else
-            this->cmd_smash->addJob(this,p0,BgState,PipCmd);
+            this->cmd_smash->addJob(this,p0,BgState,PipCmd);//pipCmd
     }
 
 

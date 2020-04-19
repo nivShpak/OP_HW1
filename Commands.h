@@ -86,7 +86,7 @@ public:
 ///   PipeCommand
 class PipeCommand : public Command {
     // TODO: Add your data members
-    bool firstOption;
+    bool firstOption;//first | second |&
 public:
     PipeCommand(const char* cmd_line);
     explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst);
