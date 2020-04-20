@@ -706,6 +706,7 @@ unsigned int JobsList::GetMaxJobid() {
 }
       
 unsigned int JobsList::GetLastStoppedJobId() {
+    this->removeFinishedJobs();
     int jid=0;
     getLastStoppedJob(&jid);
     return jid;
@@ -716,6 +717,7 @@ void JobsList::SetMaxJobid(unsigned int new_maxid) {
 }
 
 unsigned int JobsList::GetPidByJid(unsigned int Jid) {
+    this->removeFinishedJobs();
     for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
         if (it->GetJobId() == Jid) {
             return it->GetJobPid();
@@ -780,6 +782,7 @@ JobsList::JobEntry *JobsList::getLastJob(int *lastJobId) {
 }
 
 JobsList::JobEntry *JobsList::getLastStoppedJob(int* jobId) {
+    this->removeFinishedJobs();
     if(jobsVector.empty())
         return nullptr;
     int size = jobsVector.size();
@@ -909,7 +912,8 @@ void ExternalCommand::execute() {
         }
     }
     else {//son
-        if(isRedPipeOther==OtherCmd) //pipe dosent change pgrd
+        front_pid = 0;
+        if(isRedPipeOther!=PipCmd) //pipe dosent change pgrd
             setpgrp(); // we have to do it for the son
         execv(_args[0],_args);
         perror("smash error: execv failed");
