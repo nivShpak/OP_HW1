@@ -4,12 +4,8 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
-#include <iomanip>
 #include "Commands.h"
 #include <sys/types.h>
-
-
-#include "signals.h"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -122,8 +118,8 @@ void _removeBackgroundSign(char* cmd_line) {
     // replace the & (background sign) with space and then remove all tailing spaces.
     cmd_line[idx] = ' ';
     // truncate the command line string up to the last non-space character
-    //cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
-    cmd_line[str.find_last_not_of(WHITESPACE, idx)] = 0;
+    //cmd_line[str.find_last_not_of(WHITESPACE, idx)] = 0;
+    cmd_line[str.find_last_not_of(WHITESPACE, idx)+1] = 0;
 }
 
 
@@ -387,7 +383,7 @@ Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line)
     ///todo: delete _args
 }
 
-Chprompt::~Chprompt(){};
+
 
 void Chprompt::execute() {
         cmd_smash->setPrompt(this->prompt);
@@ -414,7 +410,7 @@ KillCommand::KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(
                 string id_s = to_string(id);
             int signal = stoi(args[1].c_str() + 1);
             string sig_string = to_string(signal);
-            if (id_s == args[2] & sig_string == (args[1].c_str() + 1) & signal >= 1 & signal <= 31) {
+            if ((id_s == args[2]) & (sig_string == (args[1].c_str() + 1)) & (signal >= 1 )& (signal <= 31)) {
                 this->jobID = id;
                 this->signal = signal;
             }
@@ -434,7 +430,7 @@ void KillCommand::execute() {
     }
     if (kill(pid,this->signal)!=0){
         perror("smash error: kill failed");
-        cout<<"here2"<<endl;
+        //cout<<"here2"<<endl;// its a a mistake?
     }
     cout<<"signal number "<< this->signal <<" has sent to pid "<< pid <<endl;
 }
@@ -757,7 +753,7 @@ void JobsList::addJob(Command *cmd, pid_t pid, State state,RedPipOther isRedPipe
     maxJobId++;
 }
       
-void JobsList::removeJobById(int jobId) {
+void JobsList::removeJobById(unsigned int jobId) {
     if(jobsVector.empty())
         return;
     int size = jobsVector.size();
@@ -783,15 +779,18 @@ JobsList::JobEntry *JobsList::getLastJob(int *lastJobId) {
     return &jobsVector[jobsVector.size()-1];
 }
 
-JobsList::JobEntry *JobsList::getLastStoppedJob(int *jobId) {
+JobsList::JobEntry *JobsList::getLastStoppedJob(int* jobId) {
     if(jobsVector.empty())
         return nullptr;
     int size = jobsVector.size();
     for (int i = size-1; i >=0; --i) {
-        if(jobsVector[i].GetJobState()==StoppedState)
-            *jobId=jobsVector[i].GetJobId();
+        if(jobsVector[i].GetJobState()==StoppedState) {
+            *jobId = jobsVector[i].GetJobId();
             return &jobsVector[i];
+        }
     }
+    *jobId=0;
+    return nullptr;
 }
 
 
@@ -810,25 +809,17 @@ bool JobsList::JobEntry::operator<(const JobsList::JobEntry &jobEntry) const {
 }
 
 RedPipOther JobsList::JobEntry::GetRedPipOther() {
-    if(this== nullptr)
-        return OtherCmd;
     return isRedPipeOther;
 }
 unsigned int JobsList::JobEntry::GetJobId() {
-    if(this== nullptr)
-        return 0;
     return jobId;
 }
 
 unsigned int JobsList::JobEntry::GetJobPid() {
-    if(this== nullptr)
-        return 0;
     return jobPid;
 }
 
 double JobsList::JobEntry::GetJobElapsed() {
-    if(this== nullptr)
-        return FAIL;
     time_t currentTime;
     currentTime=time(nullptr);
     return difftime(currentTime,jobStart);///check about fault
@@ -839,8 +830,6 @@ State JobsList::JobEntry::GetJobState() {
 }
       
 void JobsList::JobEntry::zeroJobStart() {
-    if(this== nullptr)
-        return;
     time_t currentTime;
     currentTime=time(nullptr);
     jobStart=currentTime;
@@ -853,14 +842,10 @@ void JobsList::JobEntry::SetJobState(State newState) {
 }
       
 string JobsList::JobEntry::GetJobCmdLine() {
-    if(this== nullptr)
-        return nullptr;
     return this->commandJob->GetCmd_line();
 }
 
-JobsList::JobEntry* JobsList::getJobById(int jobId) {
-    if(this== nullptr)
-        return nullptr;
+JobsList::JobEntry* JobsList::getJobById(unsigned int jobId) {
     int size = jobsVector.size();
     for (int i=0; i<size; ++i) {
         if(jobsVector[i].GetJobId()==jobId)
@@ -1136,7 +1121,7 @@ void PipeCommand::execute() {
             else { //pipe process
                 //wait(NULL);
                 front_pid = p2;
-                //waitpid(p2, &status, WUNTRACED);///we should wait to output?
+                waitpid(p2, &status, WUNTRACED);///we should wait to output?
                 //if(WIFSTOPPED(status)){
                 //kill(SIGCONT,smash_pid);
                 //}
@@ -1214,13 +1199,13 @@ void CpCommand::execute() {
             this->cmd_smash->addJob(this, pid,BgState,isRedPipeOther,realCmd);
         }
     } else {
+            setpgrp();
 
             if (this->num_of_arg != 3) {
                 ///invalid num of arg
                 cmd_smash->DeleteAll();
                 exit(0);
             }
-            setpgrp();
             src = open(args[1].c_str(), O_RDONLY);
             if (src == FAIL) {
                 perror("smash error: open failed");

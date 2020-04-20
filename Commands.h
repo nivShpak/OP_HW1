@@ -113,8 +113,9 @@ class Chprompt : public BuiltInCommand {
     string prompt;
 public:
     Chprompt( SmallShell* smash, const char* new_prompt = "smash>");
+    virtual ~Chprompt()= default;
     void execute() override;
-    ~Chprompt();
+
 };
 
 ///==========================================================================================
@@ -238,8 +239,8 @@ public:
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
-    JobEntry * getJobById(int jobId);
-    void removeJobById(int jobId);
+    JobEntry * getJobById(unsigned int jobId);
+    void removeJobById(unsigned int jobId);
     JobEntry * getLastJob(int* lastJobId);
     unsigned int GetLastStoppedJobId();
     JobEntry *getLastStoppedJob(int *jobId);
