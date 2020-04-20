@@ -1171,6 +1171,24 @@ void PipeCommand::execute() {
 ///==========================================================================================
 ///   cp
 
+bool isSamePath(string a, string b){
+    if (a==b)
+        return true;
+    string full = (a.size()>b.size())? a:b ;
+    string rel = (a.size()<b.size())? a:b ;
+    if (rel[0]=='/'){
+        rel.erase(0);
+    }
+    char* _curr = get_current_dir_name();
+    string curr = (string)_curr;
+    free (_curr);
+    if (curr[curr.size()]=='/'){
+        rel.erase(curr.size());
+    }
+    curr.append("/").append(rel);
+    if (curr == full) return true;
+    return false;
+}
 
 CpCommand::CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst,Command* realCmdConst)
 : BuiltInCommand(cmd_line,smash), run(run),isRedPipeOther(redPipConst),realCmd(realCmdConst){
@@ -1196,58 +1214,62 @@ void CpCommand::execute() {
             this->cmd_smash->addJob(this, pid,BgState,isRedPipeOther,realCmd);
         }
     } else {
-        setpgrp();
 
             if (this->num_of_arg != 3) {
                 ///invalid num of arg
+                cmd_smash->DeleteAll();
                 exit(0);
             }
+            setpgrp();
             src = open(args[1].c_str(), O_RDONLY);
             if (src == FAIL) {
                 perror("smash error: open failed");
+                cmd_smash->DeleteAll();
                 exit(0);
             }
-            dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-            if (dst == FAIL) {
-                if (close(src) == FAIL)
+            if (!isSamePath(args[1], args[2])) {
+                dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+                if (dst == FAIL) {
+                    if (close(src) == FAIL)
+                        perror("smash error: close failed");
+                    perror("smash error: open failed");
+                    cmd_smash->DeleteAll();
+                    exit(0);
+                }
+                char buff[30];
+                int read_count = 1;
+                while (read_count) {
+                    read_count = read(src, (void *) buff, 30);
+                    if (read_count == FAIL) {
+                        if (close(src) == FAIL) {
+                            perror("smash error: close failed");
+                        }
+                        if (close(dst) == FAIL) {
+                            perror("smash error: close failed");
+                        }
+                        perror("smash error: read failed");
+                        cmd_smash->DeleteAll();
+                        exit(0);
+                    }
+                    if (write(dst, (void *) buff, read_count) == FAIL) {
+                        if (close(src) == FAIL) {
+                            perror("smash error: close failed");
+                        }
+                        if (close(dst) == FAIL) {
+                            perror("smash error: close failed");
+                        }
+                        perror("smash error: read failed");
+                        cmd_smash->DeleteAll();
+                        exit(0);
+                    }
+                }
+                if (close(dst) == FAIL)
                     perror("smash error: close failed");
-                perror("smash error: open failed");
-                exit(0);
             }
-            char buff[30];
-            int read_count = 1;
-            while (read_count) {
-                read_count = read(src, (void *) buff, 30);
-                if (read_count == FAIL) {
-                    if (close(src) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    if (close(dst) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    perror("smash error: read failed");
-                    exit(0);
-                }
-                if (write(dst, (void *) buff, read_count) == FAIL) {
-                    if (close(src) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    if (close(dst) == FAIL) {
-                        perror("smash error: close failed");
-                    }
-                    perror("smash error: read failed");
-                    exit(0);
-                }
-            }
-            if (close(dst) == FAIL)
-                perror("smash error: close failed");
             if (close(src) == FAIL)
-                perror("smash error: close failed");
+                    perror("smash error: close failed");
             cout << "smash: " << args[1] << " was copied to " << args[2] << endl;
-            ///throw string("kill son");
-            ///delete cmd_smash;
             cmd_smash->DeleteAll();
             exit(0);
         }
-
 }
