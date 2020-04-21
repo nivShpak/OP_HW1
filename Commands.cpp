@@ -339,13 +339,13 @@ void ChangeDirCommand::execute() {
         return;
     }
     if(args.size() > 2){
-        cout<<"smash error: cd: too many arguments"<<endl;
+        cerr<<"smash error: cd: too many arguments"<<endl;
         free (current_dir);
         return;
     }
     if(args[1]=="-") {
         if(cmd_smash->GetLastPwd()==""){
-           cout<<"smash error: cd: OLDPWD not set"<<endl;
+           cerr<<"smash error: cd: OLDPWD not set"<<endl;
             free (current_dir);
             return;
         }
@@ -420,12 +420,12 @@ KillCommand::KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(
 
 void KillCommand::execute() {
     if (this->signal==0){
-        cout<<"smash error: kill: invalid argument"<<endl;
+        cerr<<"smash error: kill: invalid argument"<<endl;
         return;
     }
     int pid = this->jl->GetPidByJid(this->jobID);
     if (pid==0) {
-        cout<<"smash error: kill: job-id "<<this->jobID<<" does not exist"<<endl;
+        cerr<<"smash error: kill: job-id "<<this->jobID<<" does not exist"<<endl;
         return;
     }
     if (kill(pid,this->signal)!=0){
@@ -476,24 +476,24 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsig
             jid = stoi(args[1],&sz);//or stoul
             string sub=string(args[1]).substr(sz);
             if(sub.compare("")!=0||args.size() > 2||args[1][0]=='-'){ //which kind of error "fg 0" returns?
-                cout<<"smash error: "<<s<<": invalid arguments"<<endl;
+                cerr<<"smash error: "<<s<<": invalid arguments"<<endl;
                 throw FgBgException();
             }
 
             enterid= true;
         }
         catch(invalid_argument){
-            cout<<"smash error: "<<s<<": invalid arguments"<<endl;
+            cerr<<"smash error: "<<s<<": invalid arguments"<<endl;
             throw FgBgException();
         }
         //error massages
     }
     if(isFg&& jobs->GetMaxJobid()==0  && !enterid){
-        cout<<"smash error: "<<s<<": jobs list is empty"<<endl;
+        cerr<<"smash error: "<<s<<": jobs list is empty"<<endl;
         throw FgBgException();
     }
     if(!isFg&& jobs->GetLastStoppedJobId()==0 && !enterid){
-        cout<<"smash error: "<<s<<": there is no stopped jobs to resume"<<endl;
+        cerr<<"smash error: "<<s<<": there is no stopped jobs to resume"<<endl;
         throw FgBgException();
     }
     JobsList::JobEntry* job=jobs->getJobById(jid);
@@ -502,12 +502,12 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsig
     (*redPipOther)=job->GetRedPipOther();
 
     if(*jobId== 0) {
-        cout << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
+        cerr << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
         throw FgBgException();
     }
     if(!isFg&&(job)->GetJobState()==BgState) {
 
-        cout << "smash error: " << s << ": job-id " << jid << " dis already running in the background" << endl;
+        cerr << "smash error: " << s << ": job-id " << jid << " dis already running in the background" << endl;
         throw FgBgException();
     }
 
@@ -739,9 +739,9 @@ void JobsList::killAllJobs() {
     for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
         kill(it->GetJobPid(),SIGKILL);
     }
-    cout<<"smash: sending SIGKILL to "<<jobsVector.size() <<" jobs:"<<endl;
+    cout<<"smash: sending SIGKILL signal to "<<jobsVector.size() <<" jobs:"<<endl;
     for (auto it = jobsVector.begin(); it != jobsVector.end(); it = jobsVector.begin()) {
-        cout<<it->GetJobPid() <<":"<<it->GetJobCmdLine() <<endl;
+        cout<<it->GetJobPid() <<": "<<it->GetJobCmdLine() <<endl;
         jobsVector.erase(it);
     }
 }
