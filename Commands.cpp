@@ -1175,7 +1175,6 @@ void PipeCommand::execute() {
                 alarm(duration);
             }
             waitpid(p0, &status, WUNTRACED);
-
             if(WIFSTOPPED(status)){
                 this->cmd_smash->addJob(this,p0,StoppedState,PipCmd);
             }
@@ -1333,7 +1332,7 @@ void TimeOutCommand::execute() {
         string::size_type sz;
         duration = stoi(args[1], &sz);//or stoul
         string sub = string(args[1]).substr(sz);
-        if(sub.compare("") != 0 ){
+        if(sub.compare("") != 0||duration<=0 ){
             cerr << "smash error: " << "timeout: invalid arguments" << endl;
             throw FgBgException();
         }
@@ -1346,17 +1345,18 @@ void TimeOutCommand::execute() {
     string fullCmd_line = (string)cmd_line;
     string cmdLine1;
     int bufStart = 0;
-    bool isBack = _isBackgroundComamnd(fullCmd_line.c_str());
-    _removeBackgroundSign((char *) fullCmd_line.c_str());
+    //bool isBack = _isBackgroundComamnd(fullCmd_line.c_str());
+    //_removeBackgroundSign((char *) fullCmd_line.c_str());
     string s="timeout "+to_string(duration)+SPACE;
     bufStart = fullCmd_line.find(s);
 
     cmdLine1 = fullCmd_line.substr(bufStart+s.size() );
     cmdLine1=_trim(cmdLine1);
-    if (isBack) {
+   /* if (isBack) {
         cmdLine1.push_back(SPACE);
         cmdLine1.push_back('&');
     }
+    */
     int n1 = cmdLine1.length();
     char charCmdLine1[n1 + 1];
     strcpy(charCmdLine1, cmdLine1.c_str());
@@ -1526,6 +1526,18 @@ TimeOutList::TimeOutEntry*  TimeOutList::GetTOFinishNow(time_t now) {
     }
     return nullptr;
 }
+void  TimeOutList::SetAlarmTOFinishNext(time_t now) {
+    if(tOVector.empty())
+        return;
+    time_t should_finish=tOVector[0].GetTimeOutTimeStep()+tOVector[0].GetTimeOuDuration();
+    time_t from_now=should_finish-now;
+    if(from_now==0){
+        kill(smash_pid,SIGALRM);
+        return;
+    }
+
+    alarm(from_now);
+}
 
 
 ///==========================================================================================
@@ -1538,6 +1550,10 @@ TimeOutList::TimeOutEntry::TimeOutEntry(unsigned int tOidConst, Command *command
 }
 
 bool TimeOutList::TimeOutEntry::operator<(const TimeOutList::TimeOutEntry &timeOutEntry) const {
+    if(tOTimeStep+duration<timeOutEntry.tOTimeStep+timeOutEntry.duration)
+        return true;
+    if(tOTimeStep+duration>timeOutEntry.tOTimeStep+timeOutEntry.duration)
+        return true;
     return this->tOId<timeOutEntry.tOId;
 }
 
@@ -1548,17 +1564,17 @@ ostream &operator<<(ostream &os, TimeOutList::TimeOutEntry &to) {
 
 
 
-unsigned int TimeOutList::TimeOutEntry::GetTimeOutId() {
+const unsigned int TimeOutList::TimeOutEntry::GetTimeOutId() {
     return tOId;
 }
 
 pid_t TimeOutList::TimeOutEntry::GetTimeOutPid() {
     return tOPid;
 }
-time_t TimeOutList::TimeOutEntry::GetTimeOutTimeStep() {
+const time_t TimeOutList::TimeOutEntry::GetTimeOutTimeStep() {
     return tOTimeStep;
 }
-time_t TimeOutList::TimeOutEntry::GetTimeOuDuration() {
+const time_t TimeOutList::TimeOutEntry::GetTimeOuDuration() {
     return duration;
 }
 

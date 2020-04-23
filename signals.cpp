@@ -54,13 +54,12 @@ void ctrlCHandlerPipe(int sig_num) {
 void alarmHandler(int sig_num) {
     // TODO: Add your implementation
 
-
+    time_t next_alarm=0;
     //search for endTimeOut and destroy
     time_t currentTime;
     currentTime = time(nullptr);
     TimeOutList *tOList = getSmashGlob()->GetTimeOutList();
     TimeOutList::TimeOutEntry *tOentry = tOList->GetTOFinishNow(currentTime);
-    do {
         if (tOentry == nullptr) {
             //cout<<"error!! smash: got an alarm and its null"<<endl;
             return;
@@ -72,12 +71,9 @@ void alarmHandler(int sig_num) {
             cout << "smash: got an alarm" << endl;
             cout << "smash:" << tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
         }
-        if(alarm(0)<2)
-            tOentry=tOList->GetTOFinishNow(currentTime);//how to get the next alarm?
-        else
-            break;
-    }
-    while (tOentry!= nullptr);
+
+        tOList->SetAlarmTOFinishNext(currentTime);
+
 
 
 }

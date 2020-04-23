@@ -287,13 +287,13 @@ public:
         TimeOutEntry(const TimeOutEntry& timeOutEntry)= default;
         bool operator<(const TimeOutEntry &timeOutEntry) const;
         friend ostream& operator<<( ostream& os,TimeOutEntry& to);
-        unsigned int GetTimeOutId();
+        const unsigned int GetTimeOutId();
         pid_t GetTimeOutPid();
-        time_t GetTimeOuDuration();
+        const time_t GetTimeOuDuration();
         double GetTimeOutElapsed();
         string  GetTimeOutCmdLine();
         void  zeroTimeOutStart();
-        time_t GetTimeOutTimeStep();
+        const time_t GetTimeOutTimeStep();
     };
     // TODO: Add your data members
     vector<TimeOutEntry> tOVector;
@@ -318,6 +318,7 @@ public:
     void SetMaxTOid(unsigned int new_maxid);
     unsigned int GetPidFinishNow();
     TimeOutEntry* GetTOFinishNow(time_t now);
+    void  SetAlarmTOFinishNext(time_t now);
 
 };
 ///==========================================================================================
