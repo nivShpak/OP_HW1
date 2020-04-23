@@ -54,7 +54,6 @@ void ctrlCHandlerPipe(int sig_num) {
 void alarmHandler(int sig_num) {
     // TODO: Add your implementation
 
-    time_t next_alarm=0;
     //search for endTimeOut and destroy
     time_t currentTime;
     currentTime = time(nullptr);
@@ -65,14 +64,14 @@ void alarmHandler(int sig_num) {
             return;
         }
         pid_t pid = tOentry->GetTimeOutPid();
-        if (getSmashPid() != tOentry->GetTimeOutPid()) {
+        if (getSmashPid() != pid) {
             kill(pid, SIGKILL);
-            tOList->removeTimeOutById(tOentry->GetTimeOutId());
             cout << "smash: got an alarm" << endl;
-            cout << "smash:" << tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
+            cout << "smash:timeout "<<tOentry->GetTimeOuDuration() <<" "<< tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
+            tOList->removeTimeOutById(tOentry->GetTimeOutId());
         }
 
-        tOList->SetAlarmTOFinishNext(currentTime);
+        tOList->SetAlarmTONext(currentTime);
 
 
 

@@ -987,24 +987,16 @@ void RedirectionCommand::execute() {
     strcpy(charCmdLine1, cmdLine1.c_str());
     strcpy(charCmdLine2, cmdLine2.c_str());
 
-    /*
-    int p = fork();
-    if (p < 0)
-        perror("smash error: fork failed");
-    if (p == 0) {//child proc
-        setpgrp();
-        */
+
         int fd1 = dup(1);
         if (fd1 == FAIL) {
             perror("smash error: dup failed");
-            //cmd_smash->DeleteAll();
-           // exit(0);
+
         }
 
         if (close(1) == FAIL) {
             perror("smash error: close failed");//closes stdout
-            //cmd_smash->DeleteAll();
-            //exit(0);
+
         }
         int fd;
        // mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -1014,16 +1006,14 @@ void RedirectionCommand::execute() {
             fd = open(filename, O_WRONLY | O_TRUNC| O_CREAT , mode);//stdout to file
             if (fd == FAIL) {
                 perror("smash error: open failed");//closes stdout
-               // cmd_smash->DeleteAll();
-                //exit(0);
+
             }
 
         } else {
             fd = open(filename, O_WRONLY | O_APPEND| O_CREAT , mode);//stdout to file
             if (fd == FAIL) {
                 perror("smash error: open failed");//closes stdout
-               // cmd_smash->DeleteAll();
-               // exit(0);
+
             }
         }
 
@@ -1048,23 +1038,8 @@ void RedirectionCommand::execute() {
             perror("smash error: dup2 failed");
 
         }
-        //cmd_smash->DeleteAll();
-       // exit(0);
-   /* } else {//smash proc
-        if(!isBack) {
-            int status;
-            front_pid = p;
-            waitpid(p, &status, WUNTRACED);
-            if (WIFSTOPPED(status)) {
-                this->cmd_smash->addJob(this, p, StoppedState, RedCmd);
-            }
-            front_pid = 0;
-        }else
-            this->cmd_smash->addJob(this, p, BgState, RedCmd);
 
-
-    }
-    */
+    
 }
 
 
@@ -1384,10 +1359,10 @@ TimeOutList::TimeOutList():maxTOId(0) {
 }
 
 void TimeOutList::addTimeOut(Command *cmd, pid_t pid, time_t duration) {
-    this->removeFinishedTimeOut();
 
     tOVector.push_back(TimeOutEntry(maxTOId+1,cmd,pid,duration));
     maxTOId++;
+    this->sortAndDelete();
 }
 void TimeOutList::printTimeOutList() {
     int size = tOVector.size();
@@ -1430,7 +1405,7 @@ void TimeOutList::sortAndDelete(){
 }
 
 void TimeOutList::killAllTimeOut() {
-    this->removeFinishedTimeOut();
+    this->sortAndDelete();
     for (auto it = tOVector.begin(); it != tOVector.end(); ++it) {
         kill(it->GetTimeOutPid(),SIGKILL);
     }
@@ -1443,6 +1418,7 @@ void TimeOutList::killAllTimeOut() {
 
 
 void TimeOutList::removeTimeOutById(unsigned int ToId) {
+    this->sortAndDelete();
     if(tOVector.empty())
         return;
     int size = tOVector.size();
@@ -1515,18 +1491,32 @@ TimeOutList::TimeOutEntry*  TimeOutList::GetTOFinishNow(time_t now) {
     time_t timeStep;
     time_t dur;
 
+
+    if(tOVector.empty())
+        return nullptr;
+    timeStep=tOVector[0].GetTimeOutTimeStep();
+    dur=tOVector[0].GetTimeOuDuration();
+    should_finish=timeStep+dur;
+    secArea=difftime(now,should_finish);
+    if (secArea>=-1&&secArea<=1) {
+        return &(tOVector[0]);
+    }
+    /*
     for (auto it = tOVector.begin(); it != tOVector.end(); ++it) {
         timeStep=it->GetTimeOutTimeStep();
         dur=it->GetTimeOuDuration();
-        should_finish=timeStep+dur;
+        should_finish=timeStep +dur;
         secArea=difftime(now,should_finish);
-        if (secArea>=-2&&secArea<=2) {
+        if (secArea>=-1&&secArea<=1) {
             return &(*it);
         }
     }
+     */
     return nullptr;
+
 }
-void  TimeOutList::SetAlarmTOFinishNext(time_t now) {
+void  TimeOutList::SetAlarmTONext(time_t now) {
+    this->sortAndDelete();
     if(tOVector.empty())
         return;
     time_t should_finish=tOVector[0].GetTimeOutTimeStep()+tOVector[0].GetTimeOuDuration();

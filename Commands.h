@@ -318,7 +318,7 @@ public:
     void SetMaxTOid(unsigned int new_maxid);
     unsigned int GetPidFinishNow();
     TimeOutEntry* GetTOFinishNow(time_t now);
-    void  SetAlarmTOFinishNext(time_t now);
+    void  SetAlarmTONext(time_t now);
 
 };
 ///==========================================================================================
