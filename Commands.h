@@ -37,9 +37,8 @@ class JobsList;
 class JobsList;
 class EmptyCommandException : public exception {};
 __pid_t getFrontPid ();
-__pid_t getPipePid ();
 __pid_t getSmashPid ();
-__pid_t getPipePidGrp ();
+SmallShell* getSmashGlob();
 
 ///==========================================================================================
 ///   Command
@@ -51,9 +50,11 @@ protected:
     vector<string> args;
     SmallShell* cmd_smash;
     unsigned int cmd_pid=0;
+    bool isTimeOut;
+    time_t duration;
 public:
     Command(const char* cmd_line);
-    Command(const char* cmd_line,SmallShell& smash);
+    Command(const char* cmd_line,SmallShell& smash,bool isTimeOut=false, time_t duration=0);
     virtual ~Command();
     virtual void execute() = 0;
     //virtual void prepare();
@@ -78,7 +79,8 @@ class ExternalCommand : public Command {
     RedPipOther isRedPipeOther;
     Command* realCmd;
 public:
-    ExternalCommand(const char* cmd_line,SmallShell& smash,RedPipOther isRedPipe,Command* realCmd);
+    ExternalCommand(const char* cmd_line,SmallShell& smash,RedPipOther isRedPipe,Command* realCmd,bool isTimeOut,
+                    time_t duration);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -89,7 +91,7 @@ class PipeCommand : public Command {
     bool firstOption;//first | second |&
 public:
     PipeCommand(const char* cmd_line);
-    explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst);
+    explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst,bool isTimeOut, time_t duration);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -100,13 +102,14 @@ class RedirectionCommand : public Command {
     bool firstOption;
 public:
     explicit RedirectionCommand(const char *cmdLine);
-    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst);
+    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst,bool isTimeOut, time_t duration);
 
     virtual ~RedirectionCommand() {}
     void execute() override;
     //void prepare() override;
     //void cleanup() override;
 };
+
 ///==========================================================================================
 ///   Chprompt
 class Chprompt : public BuiltInCommand {
@@ -170,7 +173,8 @@ class CpCommand : public BuiltInCommand {
     RedPipOther isRedPipeOther;
     Command* realCmd;
 public:
-    CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst= OtherCmd,Command* realCmdConst= nullptr);
+    CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr,
+            bool isTimeOut=false,time_t duration=0);
     virtual ~CpCommand() {};
     void execute() override;
 };
@@ -206,8 +210,8 @@ public:
         // TODO: Add your data members
         unsigned int jobId;
         Command* commandJob;
-        time_t jobStart;
         unsigned int jobPid;
+        time_t jobStart;
         State jobState;
         RedPipOther isRedPipeOther;
     public:
@@ -235,7 +239,7 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd,pid_t pid=0,State state=BgState,RedPipOther isRedPipeOther=OtherCmd,Command* realCmd=nullptr);
+    void addJob(Command* cmd,pid_t pid,State state,RedPipOther isRedPipeOthe,Command* realCmd);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -262,6 +266,71 @@ public:
     virtual ~JobsCommand() {}
     void execute() override;
 };
+///==========================================================================================
+///   TimeOutList
+class TimeOutList {
+public:
+    class TimeOutEntry {
+        // TODO: Add your data members
+        unsigned int tOId;
+        Command* commandTO;
+        unsigned int tOPid;
+        time_t tOTimeStep;
+        time_t duration;
+        //State jobState;
+        //RedPipOther isRedPipeOther;
+    public:
+        //JobEntry &operator==(const JobEntry &jobEntry);
+        //JobEntry &operator!=(const JobEntry &jobEntry)= default;
+        //JobEntry &operator++();
+        TimeOutEntry(unsigned int tOid,Command* command,pid_t pid, time_t duration);
+        TimeOutEntry(const TimeOutEntry& timeOutEntry)= default;
+        bool operator<(const TimeOutEntry &timeOutEntry) const;
+        friend ostream& operator<<( ostream& os,TimeOutEntry& to);
+        unsigned int GetTimeOutId();
+        pid_t GetTimeOutPid();
+        time_t GetTimeOuDuration();
+        double GetTimeOutElapsed();
+        string  GetTimeOutCmdLine();
+        void  zeroTimeOutStart();
+        time_t GetTimeOutTimeStep();
+    };
+    // TODO: Add your data members
+    vector<TimeOutEntry> tOVector;
+    unsigned int maxTOId;
+public:
+    TimeOutList();
+    TimeOutList(const TimeOutList& timeOutList)= delete;
+    void operator=(const TimeOutList& timeOutList)= delete;
+    ~TimeOutList()= default;
+    void addTimeOut(Command* cmd,pid_t pid, time_t duration);
+    void printTimeOutList();
+    void killAllTimeOut();
+    void removeFinishedTimeOut();
+    TimeOutEntry * getTimeOutById(unsigned int tOId);
+    void removeTimeOutById(unsigned int tOId);
+    TimeOutEntry * getLastTimeOut(int* lastTOId);
+    // TODO: Add extra methods or modify exisitng ones as needed
+    void sortAndDelete();
+    void sortOnly();
+    unsigned int GetPidByTOid(unsigned int tOid);
+    unsigned int GetMaxTOid();
+    void SetMaxTOid(unsigned int new_maxid);
+    unsigned int GetPidFinishNow();
+    TimeOutEntry* GetTOFinishNow(time_t now);
+
+};
+///==========================================================================================
+///   TimeOutCommand
+class TimeOutCommand : public Command{
+    // TODO: Add your data members
+    TimeOutList* tOList;
+public:
+    TimeOutCommand(const char* cmd_line, TimeOutList* tOL,SmallShell& smash);
+    virtual ~TimeOutCommand() {}
+    void execute() override;
+};
+
 ///==========================================================================================
 ///   Kill
 class KillCommand : public BuiltInCommand {
@@ -318,12 +387,13 @@ private:
     string prompt;
     string lastPwdSmash;
     JobsList* jobsListSmash;
+    TimeOutList* timeOutListSmash;
     vector<Command*> commandVectorSmash;
     SmallShell();
 public:
     const string getPrompt()const;
     void setPrompt(string new_prompt);
-    Command *CreateCommand(const char* cmd_line,RedPipOther redPipOther,Command* realCmd);
+    Command *CreateCommand(const char* cmd_line,RedPipOther redPipOther,Command* realCmd,bool isTimeOut, time_t duration);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton
@@ -334,11 +404,15 @@ public:
     }
     ~SmallShell();
     void DeleteAll();
-    void executeCommand(const char* cmd_line, RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr);
+    void executeCommand(const char* cmd_line, RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr,bool isTimeOut= false,
+                        time_t duration=0);
     // TODO: add extra methods as needed
     string GetLastPwd();
     void setLastPwd( string dir);
-    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr);
+    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther,Command* realCmd);
+    TimeOutList*& GetTimeOutList();
+
+    void addTimeOut(Command *cmd, pid_t pid, time_t duration);
 };
 
 ///==========================================================================================
