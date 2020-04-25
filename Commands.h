@@ -228,6 +228,7 @@ public:
         double GetJobElapsed();
         State  GetJobState();
         string  GetJobCmdLine();
+        Command*  GetJobCmd();
         void  zeroJobStart();
         void  SetJobState(State newState);
     };
@@ -350,7 +351,8 @@ class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_fgCommand;
 public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs);
+    ForegroundCommand(const char* cmd_line, JobsList* jobs,
+            bool isTimeOutConst,time_t durationConst);
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
@@ -360,7 +362,8 @@ class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_bgCommand;
 public:
-    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    BackgroundCommand(const char* cmd_line, JobsList* jobs,
+            bool isTimeOut,time_t duration);
     virtual ~BackgroundCommand() {}
     void execute() override;
 };

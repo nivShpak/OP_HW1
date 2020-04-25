@@ -220,10 +220,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther
         return new KillCommand(built_in_cmd_line, jobsListSmash);
     }
     else if (command_args[0]=="fg") {
-        return new ForegroundCommand(built_in_cmd_line,jobsListSmash);
+        return new ForegroundCommand(built_in_cmd_line,jobsListSmash,isTimeOut,duration);
     }
     else if (command_args[0]=="bg") {
-        return new BackgroundCommand(built_in_cmd_line,jobsListSmash);
+        return new BackgroundCommand(built_in_cmd_line,jobsListSmash,isTimeOut,duration);
     }
     else if (command_args[0]=="quit") {
         return new QuitCommand(built_in_cmd_line,this->jobsListSmash);
@@ -473,7 +473,8 @@ void QuitCommand::execute() {
 ///==========================================================================================
 ///      FgBgCheck
   
-unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsigned int* jobId,RedPipOther* redPipOther){
+unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s
+        , unsigned int* jobId,RedPipOther* redPipOther,Command** cmdForTO){
     jobs->removeFinishedJobs();
     bool isFg=true;
     if(strcmp(s,"bg")==0)
@@ -515,6 +516,7 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsig
 
     (*jobId)=job->GetJobId();
     (*redPipOther)=job->GetRedPipOther();
+    (*cmdForTO)=job->GetJobCmd();
 
     if(*jobId== 0) {
         cerr << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
@@ -529,14 +531,17 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s, unsig
     cout<<(job)->GetJobCmdLine()<<" : "<<(job)->GetJobId()<<endl; //dont know if we shuld print jobid or procid
 
     unsigned int jPid=(job)->GetJobPid();
+
     return jPid;
 }
 
 ///==========================================================================================
 ///     FgCommand
-ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_fgCommand(jobs) {
-
-
+ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs,
+        bool isTimeOutConst=false,time_t durationConst=0)
+: BuiltInCommand(cmdLine),jobsList_fgCommand(jobs) {
+    isTimeOut=isTimeOutConst;
+    duration=durationConst;
 }
 
 
@@ -544,52 +549,24 @@ void ForegroundCommand::execute() {
     unsigned int jPid=0;
     unsigned int jid;
     RedPipOther redPipOther;
+    Command* cmdForTO= nullptr;
 
     try{
-        jPid=FgBgCheck(args,jobsList_fgCommand,"fg",&jid,&redPipOther);
+        jPid=FgBgCheck(args,jobsList_fgCommand,"fg",&jid,&redPipOther,&cmdForTO);
     }
     catch(FgBgException& e){
         return;
     }
-    /*if(redPipOther==PipCmd){
-        pipe_pid=jPid;
-        pipe_pid_grp=getpgid(jPid);
-        pid_t grpPid=pipe_pid_grp;
-        if(signal(SIGTSTP , ctrlZHandlerPipe)==SIG_ERR) {
-            perror("smash error: failed to set ctrl-Z handler");
-        }
-        if(signal(SIGINT , ctrlCHandlerPipe)==SIG_ERR) {
-            perror("smash error: failed to set ctrl-C handler");
-        }
-        int checKill = killpg(grpPid, SIGCONT);
-        int wstatus;
-        if (checKill == SUCCESS) {
-            front_pid = jPid;
-            waitpid(jPid, &wstatus, WUNTRACED);
-            if (WIFSTOPPED(wstatus)) {
-                //this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
-                this->jobsList_fgCommand->getJobById(jid)->SetJobState(StoppedState);
-                this->jobsList_fgCommand->getJobById(jid)->zeroJobStart();
-            } else {
-                jobsList_fgCommand->removeJobById(jid);
-                jobsList_fgCommand->sortOnly();
-            }
-            front_pid = 0;
-        }
-        if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
-            perror("smash error: failed to set ctrl-Z handler");
-        }
-        if(signal(SIGINT , ctrlCHandler)==SIG_ERR) {
-            perror("smash error: failed to set ctrl-C handler");
-        }
-    } else {*/
         int checkKill = kill(jPid, SIGCONT);
         int wstatus;
         if (checkKill == SUCCESS) {
+            if (isTimeOut&&cmdForTO!= nullptr) {
+                smash_glob->addTimeOut(cmdForTO, jPid, duration);
+                alarm(duration);
+            }
             front_pid = jPid;
             waitpid(jPid, &wstatus, WUNTRACED);
             if (WIFSTOPPED(wstatus)) {
-                //this->jobsList_fgCommand->addJob(this,jPid, StoppedState);
                 this->jobsList_fgCommand->getJobById(jid)->SetJobState(StoppedState);
                 this->jobsList_fgCommand->getJobById(jid)->zeroJobStart();
             } else {
@@ -599,7 +576,7 @@ void ForegroundCommand::execute() {
             front_pid = 0;
         } else
             perror("smash error: kill failed");
-    //}
+
 
 
 
@@ -607,48 +584,38 @@ void ForegroundCommand::execute() {
 }
 ///==============================================================================
 ///   BgCommand
-BackgroundCommand::BackgroundCommand(const char *cmdLine, JobsList* jobs) : BuiltInCommand(cmdLine),jobsList_bgCommand(jobs) {
+BackgroundCommand::BackgroundCommand(const char *cmdLine, JobsList* jobs,
+        bool isTimeOutConst=false,time_t durationConst=0) :
+BuiltInCommand(cmdLine),jobsList_bgCommand(jobs) {
+    isTimeOut=isTimeOutConst;
+    duration=durationConst;
 }
 
 
 void BackgroundCommand::execute() {
     unsigned int jPid=0;
     unsigned int jid;
+    Command* cmdForTO= nullptr;
     RedPipOther redPipOther;
 
     try{
-        jPid=FgBgCheck(args,jobsList_bgCommand,"bg",&jid,&redPipOther);
+        jPid=FgBgCheck(args,jobsList_bgCommand,"bg",&jid,&redPipOther,&cmdForTO);
     }
     catch(FgBgException& e){
         return;
     }
     jobsList_bgCommand->getJobById(jid)->SetJobState(BgState);
-   /* if(redPipOther==PipCmd) {
-        pipe_pid = jPid;
-        pipe_pid_grp = getpgid(jPid);
-        pid_t grpPid = pipe_pid_grp;
-        if (signal(SIGTSTP, ctrlZHandlerPipe) == SIG_ERR) {
-            perror("smash error: failed to set ctrl-Z handler");
-        }
-        if (signal(SIGINT, ctrlCHandlerPipe) == SIG_ERR) {
-            perror("smash error: failed to set ctrl-C handler");
-        }
-        int checkill = killpg(grpPid, SIGCONT);
-        if(checkill==FAIL)
-            perror("smash error: kill failed");
-        if (signal(SIGTSTP, ctrlZHandler) == SIG_ERR) {
-            perror("smash error: failed to set ctrl-Z handler");
-        }
-        if (signal(SIGINT, ctrlCHandler) == SIG_ERR) {
-            perror("smash error: failed to set ctrl-C handler");
-        }
-
-    } else{*/
         int checkill=kill(jPid, SIGCONT);
         //should we zero the time?
-        if(checkill==FAIL)
+        if(checkill==FAIL){
             perror("smash error: kill failed");
-    //}
+            return;
+        }
+    if (isTimeOut&&cmdForTO!= nullptr) {
+        smash_glob->addTimeOut(cmdForTO, jPid, duration);
+        alarm(duration);
+    }
+
 
 
 
@@ -857,7 +824,9 @@ void JobsList::JobEntry::SetJobState(State newState) {
     jobState=newState;
 
 }
-      
+Command* JobsList::JobEntry::GetJobCmd() {
+    return this->commandJob;
+}
 string JobsList::JobEntry::GetJobCmdLine() {
     return this->commandJob->GetCmd_line();
 }
@@ -1009,7 +978,7 @@ void RedirectionCommand::execute() {
 
             }
 
-        } else {
+        } else  {
             fd = open(filename, O_WRONLY | O_APPEND| O_CREAT , mode);//stdout to file
             if (fd == FAIL) {
                 perror("smash error: open failed");//closes stdout
@@ -1320,36 +1289,16 @@ void TimeOutCommand::execute() {
     string fullCmd_line = (string)cmd_line;
     string cmdLine1;
     int bufStart = 0;
-    //bool isBack = _isBackgroundComamnd(fullCmd_line.c_str());
-    //_removeBackgroundSign((char *) fullCmd_line.c_str());
     string s="timeout "+to_string(duration)+SPACE;
     bufStart = fullCmd_line.find(s);
 
     cmdLine1 = fullCmd_line.substr(bufStart+s.size() );
     cmdLine1=_trim(cmdLine1);
-   /* if (isBack) {
-        cmdLine1.push_back(SPACE);
-        cmdLine1.push_back('&');
-    }
-    */
     int n1 = cmdLine1.length();
     char charCmdLine1[n1 + 1];
     strcpy(charCmdLine1, cmdLine1.c_str());
 
     cmd_smash->executeCommand(charCmdLine1,OtherCmd, nullptr,true,duration); //is TimeOut
-    /*
-    if(!isBack) {
-        front_pid=p0;
-        waitpid(p0, &status, WUNTRACED);
-        if(WIFSTOPPED(status)){
-            this->cmd_smash->addJob(this,p0,StoppedState,PipCmd);
-        }
-        front_pid = 0;
-    }
-    else
-        this->cmd_smash->addJob(this,p0,BgState,PipCmd);//pipCmd
-}*/
-
 
 }
 
