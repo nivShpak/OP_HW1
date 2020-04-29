@@ -479,7 +479,7 @@ void KillCommand::execute() {
         cerr<<"smash error: kill: job-id "<<this->jobID<<" does not exist"<<endl;
         return;
     }
-    if (kill(pid,this->signal)!=0){
+    if (kill(pid*(-1),this->signal)!=0){
         perror("smash error: kill failed");
         //cout<<"here2"<<endl;// its a a mistake?
     }
@@ -595,7 +595,7 @@ void ForegroundCommand::execute() {
     catch(FgBgException& e){
         return;
     }
-        int checkKill = kill(jPid, SIGCONT);
+        int checkKill = kill(jPid*(-1), SIGCONT);
         int wstatus;
         if (checkKill == SUCCESS) {
             if (isTimeOut&&cmdForTO!= nullptr) {
@@ -646,7 +646,7 @@ void BackgroundCommand::execute() {
         return;
     }
     jobsList_bgCommand->getJobById(jid)->SetJobState(BgState);
-        int checkill=kill(jPid, SIGCONT);
+        int checkill=kill(jPid*(-1), SIGCONT);
         //should we zero the time?
         if(checkill==FAIL){
             perror("smash error: kill failed");
@@ -764,7 +764,7 @@ void JobsList::printJobsList() {
 void JobsList::killAllJobs() {
     this->removeFinishedJobs();
     for (auto it = jobsVector.begin(); it != jobsVector.end(); ++it) {
-        kill(it->GetJobPid(),SIGKILL);
+        kill(it->GetJobPid()*(-1),SIGKILL);
     }
     cout<<"smash: sending SIGKILL signal to "<<jobsVector.size() <<" jobs:"<<endl;
     for (auto it = jobsVector.begin(); it != jobsVector.end(); it = jobsVector.begin()) {
@@ -1422,7 +1422,7 @@ void TimeOutList::sortAndDelete(){
 void TimeOutList::killAllTimeOut() {
     this->sortAndDelete();
     for (auto it = tOVector.begin(); it != tOVector.end(); ++it) {
-        kill(it->GetTimeOutPid(),SIGKILL);
+        kill(it->GetTimeOutPid()*(-1),SIGKILL);
     }
     cout<<"smash: sending SIGKILL signal to "<<tOVector.size() <<" TimeOutCommands:"<<endl;
     for (auto it = tOVector.begin(); it != tOVector.end(); it = tOVector.begin()) {
