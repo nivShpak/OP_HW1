@@ -32,6 +32,7 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 __pid_t smash_pid = getpid();
 __pid_t front_pid = 0;
 SmallShell* smash_glob= nullptr;
+int fdScreen=-1;
 __pid_t getSmashPid (){
     return smash_pid;
 }
@@ -39,14 +40,14 @@ __pid_t getSmashPid (){
 __pid_t getFrontPid (){
     return front_pid;
 }
-SmallShell* getSmashGlob (){
-    return smash_glob;
+int getFdScreen (){
+    return fdScreen;
 }
 #define DEBUG_PRINT cerr << "DEBUG: "
 
 #define EXEC(path, arg) \
   execvp((path), (arg));
-bool is_pid_running(pid_t pid);
+
 string _ltrim(const std::string& s)
 {
     size_t start = s.find_first_not_of(WHITESPACE);
@@ -169,8 +170,8 @@ bool emptyCommand(const char* cmd){
 
 
 
-Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr, bool isTimeOut=false,
-                                    time_t duration=0) {
+Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr
+        , bool isTimeOut=false,time_t duration=0,Command* tOCmd= nullptr) {
 
     // For example:
 
@@ -185,66 +186,81 @@ Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther
     _removeBackgroundSign(built_in_cmd_line);
     _parseCommandLine(built_in_cmd_line,command_args);
     if((cmd_s.find(">")!=string::npos) && cmd_s.find(">>") == string::npos&&(command_args[0]!="timeout")){
-        return new RedirectionCommand(cmd_line,*this,isFirst,isTimeOut,duration);
+        return new RedirectionCommand(cmd_line,*this,isFirst
+                ,isTimeOut,duration,tOCmd);
     }
     else if((cmd_s.find(">>")!=string::npos)&&(command_args[0]!="timeout")){
         isFirst= false;
-        return new RedirectionCommand(cmd_line,*this,isFirst,isTimeOut,duration);
+        return new RedirectionCommand(cmd_line,*this,isFirst
+                ,isTimeOut,duration,tOCmd);
 
     }
     else if((cmd_s.find("|")!=string::npos) && cmd_s.find("|&") == string::npos&&(command_args[0]!="timeout")){
-        return new PipeCommand(cmd_line,*this,isFirst,isTimeOut,duration);
+        return new PipeCommand(cmd_line,*this,isFirst
+                ,isTimeOut,duration,tOCmd);
     }
     else if((cmd_s.find("|&")!=string::npos)&&(command_args[0]!="timeout")){
         isFirst= false;
-        return new PipeCommand(cmd_line,*this,isFirst,isTimeOut,duration);
+        return new PipeCommand(cmd_line,*this,isFirst
+                ,isTimeOut,duration,tOCmd);
     }
 
     if (command_args[0]=="pwd") {
-        return new GetCurrDirCommand(built_in_cmd_line);
+        return new GetCurrDirCommand(built_in_cmd_line
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="cd") {
-        return new ChangeDirCommand(built_in_cmd_line,*this);
+        return new ChangeDirCommand(built_in_cmd_line,*this
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="chprompt")  {
-        return new Chprompt(this,built_in_cmd_line);
+        return new Chprompt(this,built_in_cmd_line
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="showpid") {
-       return new ShowPidCommand(built_in_cmd_line);
+       return new ShowPidCommand(built_in_cmd_line
+               ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="jobs") {
         jobsListSmash->sortAndDelete();
-        return new JobsCommand(built_in_cmd_line,jobsListSmash);
+        return new JobsCommand(built_in_cmd_line,jobsListSmash
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="kill"){
-        return new KillCommand(built_in_cmd_line, jobsListSmash);
+        return new KillCommand(built_in_cmd_line, jobsListSmash
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="fg") {
-        return new ForegroundCommand(built_in_cmd_line,jobsListSmash,isTimeOut,duration);
+        return new ForegroundCommand(built_in_cmd_line,jobsListSmash
+                ,isTimeOut,duration);
     }
     else if (command_args[0]=="bg") {
-        return new BackgroundCommand(built_in_cmd_line,jobsListSmash,isTimeOut,duration);
+        return new BackgroundCommand(built_in_cmd_line,jobsListSmash
+                ,isTimeOut,duration);
     }
     else if (command_args[0]=="quit") {
         return new QuitCommand(built_in_cmd_line,this->jobsListSmash);
     }
     else if (command_args[0]=="cp"){
         Run run = (_isBackgroundComamnd(cmd_line))? Back: Front;
-        return new CpCommand(built_in_cmd_line,*this, run);
+        return new CpCommand(built_in_cmd_line,*this, run,redPipOther,realCmd
+                ,isTimeOut,duration,tOCmd);
     }
     else if (command_args[0]=="timeout") {
         timeOutListSmash->sortAndDelete();
         return new TimeOutCommand(cmd_line,timeOutListSmash,*this);
     }
     else {
-        return new ExternalCommand(cmd_line, *this,redPipOther,realCmd,isTimeOut,duration); ///its refernce for command
+        return new ExternalCommand(cmd_line, *this,redPipOther,realCmd
+                ,isTimeOut,duration,tOCmd); ///its refernce for command
     }
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line,RedPipOther redPipConst, Command* realCmd, bool isTimeOut, time_t duration) {
+void SmallShell::executeCommand(const char *cmd_line,RedPipOther redPipConst, Command* realCmd,
+        bool isTimeOut, time_t duration,Command* tOCmd) {
     // TODO: Add your implementation here
-    Command* cmd = CreateCommand(cmd_line,redPipConst,realCmd,isTimeOut,duration);
+    Command* cmd = CreateCommand(cmd_line,redPipConst,realCmd,isTimeOut,duration,tOCmd);
 
     if (cmd==NULL)
         throw SmallShellException(); //todo: maybe error
@@ -266,8 +282,9 @@ void SmallShell::setLastPwd(string dir) {
     lastPwdSmash = dir;
 }
 
-void SmallShell::addJob(Command *cmd,pid_t pid, State state = BgState,RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr) {
-    this->jobsListSmash->addJob(cmd,pid, state,redPipOther,realCmd);
+void SmallShell::addJob(Command *cmd,pid_t pid, State state = BgState,RedPipOther redPipOther=OtherCmd
+        ,Command* realCmd= nullptr,Command* tOCmd= nullptr) {
+    this->jobsListSmash->addJob(cmd,pid, state,redPipOther,realCmd,tOCmd);
 }
 
 TimeOutList *&SmallShell::GetTimeOutList() {
@@ -290,12 +307,14 @@ Command::Command(const char* cmd_lineCons):cmd_line(cmd_lineCons) {
     cmd_pid=getpid();
 }
 
-Command::Command(const char *cmd_lineCons, SmallShell &smash,bool isTimedOutConst, time_t durationConst): cmd_line(cmd_lineCons) {
+Command::Command(const char *cmd_lineCons, SmallShell &smash
+        ,bool isTimedOutConst, time_t durationConst,Command* tOCmdConst): cmd_line(cmd_lineCons) {
     this->num_of_arg = _parseCommandLine(cmd_lineCons,this->args);
     cmd_smash=&smash;
     cmd_pid=getpid();
     isTimeOut=isTimedOutConst;
     duration=durationConst;
+    tOCmd=tOCmdConst;
 }
 
 Command::~Command(){
@@ -311,16 +330,34 @@ unsigned int Command::GetCmd_pid() {
 }
 
 
-BuiltInCommand::BuiltInCommand(const char *cmdLine) : Command(cmdLine) {
+BuiltInCommand::BuiltInCommand(const char *cmdLine
+        ,bool isTimeOut,time_t duration,Command* tOCmd) : Command(cmdLine) {
+        time_t nextAlarm;
+        if(isTimeOut&&tOCmd!= nullptr){
+            smash_glob->addTimeOut(tOCmd, 0, duration);
+            nextAlarm=alarm(duration);
+        if(nextAlarm<duration&&nextAlarm!=0)
+            alarm((nextAlarm));
+    }
 }
 
-BuiltInCommand::BuiltInCommand(const char *cmd_line, SmallShell &smash) : Command(cmd_line, smash){
-}
+BuiltInCommand::BuiltInCommand(const char *cmd_line, SmallShell &smash
+        ,bool isTimeOut,time_t duration,Command* tOCmd) : Command(cmd_line, smash){
+    time_t nextAlarm;
+    if(isTimeOut&&tOCmd!= nullptr){
+            smash_glob->addTimeOut(tOCmd, 0, duration);
+            nextAlarm=alarm(duration);
+            if(nextAlarm<duration&&nextAlarm!=0)
+                alarm((nextAlarm));
+        }
+    }
 
 
 ///==========================================================================================
 ///   GWDCommand
-GetCurrDirCommand::GetCurrDirCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
+GetCurrDirCommand::GetCurrDirCommand(const char *cmdLine
+,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
+BuiltInCommand(cmdLine,isTimeOutConst,durationConst,tOCmdConst) {
 }
 
 
@@ -333,23 +370,15 @@ void GetCurrDirCommand::execute() {
 
 ///==========================================================================================
 ///   CDCommand
-ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell& smash) : BuiltInCommand(cmdLine,smash) {
-    //this->cmd_smash = smash;
+ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell& smash
+        ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
+        BuiltInCommand(cmdLine,smash,isTimeOutConst,durationConst,tOCmdConst) {
 }
-
-ChangeDirCommand::ChangeDirCommand(const char *cmdLine,  char** plastPwd= nullptr) : BuiltInCommand(cmdLine) {
-    last_pwd=*plastPwd; //fix it, problem when cd isnt legal
-    char* current_dir=get_current_dir_name();
-    if(strcmp(*plastPwd,current_dir)!=0) //we cant come back to the same dir
-        *plastPwd=current_dir;
-    free (current_dir);
-}
-
 void ChangeDirCommand::execute() {
     char* current_dir=get_current_dir_name();
     if(args.size() == 1){
-        cmd_smash->setLastPwd(string(current_dir));
-        free (current_dir);
+        //cmd_smash->setLastPwd(string(current_dir));
+        //free (current_dir);
         ///perror("smash error: chdir failed");
         return;
     }
@@ -388,7 +417,9 @@ void ChangeDirCommand::execute() {
 ///==========================================================================================
 ///      CrpromptCommand
 
-Chprompt::Chprompt(SmallShell* s, const char *cmd_line):BuiltInCommand(cmd_line) {
+Chprompt::Chprompt(SmallShell* s, const char *cmd_line
+        ,bool isTimeOutConst,time_t durationConst,Command* tOCmdConst) :
+        BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst) {
     this->cmd_smash = s;
     if (this->num_of_arg==1)
         this->prompt ="smash> ";
@@ -405,7 +436,10 @@ void Chprompt::execute() {
 }
 ///==========================================================================================
 ///      ShowpidCommand
-
+ShowPidCommand::ShowPidCommand(const char *cmd_line
+        ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
+        BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst){
+}
 void ShowPidCommand::execute(){
     cout<<"smash pid is " << getSmashPid() <<endl;
 }
@@ -413,7 +447,9 @@ void ShowPidCommand::execute(){
 ///==========================================================================================
 ///      KillCommand
 
-KillCommand::KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),jl(jobs){
+KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
+        ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
+        BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst),jl(jobs){
     this->signal=0;
     if (this->num_of_arg==3) {
         if (args[1][0]=='-' /*& args[2][0]!='-'*/) {
@@ -479,7 +515,7 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s
     bool isFg=true;
     if(strcmp(s,"bg")==0)
         isFg= false;
-    unsigned int jid=0;
+     int jid=0;
     bool enterid= false;
     if(args.size() == 1){
         if(isFg)
@@ -491,7 +527,7 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s
             string::size_type sz;
             jid = stoi(args[1],&sz);//or stoul
             string sub=string(args[1]).substr(sz);
-            if(sub.compare("")!=0||args.size() > 2||args[1][0]=='-'){ //which kind of error "fg 0" returns?
+            if(sub.compare("")!=0||args.size() > 2){ //which kind of error "fg 0" returns?
                 cerr<<"smash error: "<<s<<": invalid arguments"<<endl;
                 throw FgBgException();
             }
@@ -513,15 +549,15 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s
         throw FgBgException();
     }
     JobsList::JobEntry* job=jobs->getJobById(jid);
-
+    if(job== nullptr) {
+        cerr << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
+        throw FgBgException();
+    }
     (*jobId)=job->GetJobId();
     (*redPipOther)=job->GetRedPipOther();
     (*cmdForTO)=job->GetJobCmd();
 
-    if(*jobId== 0) {
-        cerr << "smash error: "<<s<<": job-id " << jid << " does not exist" << endl;
-        throw FgBgException();
-    }
+
     if(!isFg&&(job)->GetJobState()==BgState) {
 
         cerr << "smash error: " << s << ": job-id " << jid << " dis already running in the background" << endl;
@@ -542,10 +578,12 @@ ForegroundCommand::ForegroundCommand(const char *cmdLine, JobsList* jobs,
 : BuiltInCommand(cmdLine),jobsList_fgCommand(jobs) {
     isTimeOut=isTimeOutConst;
     duration=durationConst;
+    //tOCmd=tOCmdConst;
 }
 
 
 void ForegroundCommand::execute() {
+    time_t nextAlarm;
     unsigned int jPid=0;
     unsigned int jid;
     RedPipOther redPipOther;
@@ -562,7 +600,9 @@ void ForegroundCommand::execute() {
         if (checkKill == SUCCESS) {
             if (isTimeOut&&cmdForTO!= nullptr) {
                 smash_glob->addTimeOut(cmdForTO, jPid, duration);
-                alarm(duration);
+                nextAlarm=alarm(duration);
+                if(nextAlarm<duration&&nextAlarm!=0)
+                    alarm((nextAlarm));
             }
             front_pid = jPid;
             waitpid(jPid, &wstatus, WUNTRACED);
@@ -593,6 +633,7 @@ BuiltInCommand(cmdLine),jobsList_bgCommand(jobs) {
 
 
 void BackgroundCommand::execute() {
+    time_t nextAlarm=0;
     unsigned int jPid=0;
     unsigned int jid;
     Command* cmdForTO= nullptr;
@@ -613,7 +654,9 @@ void BackgroundCommand::execute() {
         }
     if (isTimeOut&&cmdForTO!= nullptr) {
         smash_glob->addTimeOut(cmdForTO, jPid, duration);
-        alarm(duration);
+        nextAlarm=alarm(duration);
+        if(nextAlarm<duration&&nextAlarm!=0)
+            alarm((nextAlarm));
     }
 
 
@@ -624,7 +667,9 @@ void BackgroundCommand::execute() {
 ///==========================================================================================
 ///   JobsCommand
       
-JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(cmd_line),jobsList_jobsCommand(jobs){
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs
+        ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
+        BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst),jobsList_jobsCommand(jobs){
 }
 
 
@@ -728,9 +773,12 @@ void JobsList::killAllJobs() {
     }
 }
       
-void JobsList::addJob(Command *cmd, pid_t pid=0, State state=BgState,RedPipOther isRedPipeOther=OtherCmd,Command* realCmd= nullptr) {
+void JobsList::addJob(Command *cmd, pid_t pid=0, State state=BgState,RedPipOther isRedPipeOther=OtherCmd
+        ,Command* realCmd= nullptr,Command* tOCmd= nullptr) {
     this->removeFinishedJobs();
-    if(realCmd!=nullptr)
+    if(tOCmd!=nullptr)
+        jobsVector.push_back(JobEntry(maxJobId+1,tOCmd,pid,state,isRedPipeOther));
+    else if(realCmd!=nullptr)
         jobsVector.push_back(JobEntry(maxJobId+1,realCmd,pid,state,isRedPipeOther));
     else
         jobsVector.push_back(JobEntry(maxJobId+1,cmd,pid,state,isRedPipeOther));
@@ -853,9 +901,9 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
 ///==========================================================================================
 ///   External
 
-ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr,bool isTimedOutConst=false,
-                                 time_t duration=0)
-:Command(cmd_line,smash,isTimedOutConst,duration) {
+ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr
+        ,bool isTimedOutConst=false,time_t duration=0,Command* tOCmdConst= nullptr)
+:Command(cmd_line,smash,isTimedOutConst,duration,tOCmdConst) {
     //this->cmd_smash = smash; its in Command constractur
     this->isRedPipeOther=redPipConst;
     this->realCmd=realCmdConst;
@@ -866,6 +914,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,RedPipO
 
 void ExternalCommand::execute() {
     int status;
+    time_t nextAlarm=0;
     char cmd[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line.c_str());
     if (run == Back) _removeBackgroundSign(cmd);
@@ -882,31 +931,29 @@ void ExternalCommand::execute() {
         if (this->run == Front) {
             front_pid = pid;
                 if (isTimeOut) {
-                    if ((isRedPipeOther != OtherCmd) || realCmd != nullptr) {
-                        cmd_smash->addTimeOut(realCmd, pid, duration);
-                    } else
-                        cmd_smash->addTimeOut(this, pid, duration);
-                    alarm(duration);
+                    cmd_smash->addTimeOut(tOCmd, pid, duration);
+                     nextAlarm=alarm(duration);
+                     if(nextAlarm<duration&&nextAlarm!=0)
+                         alarm((nextAlarm));
                 }
                 waitpid(pid, &status, WUNTRACED);
                 if (WIFSTOPPED(status)) {
-                    this->cmd_smash->addJob(this, pid, StoppedState, isRedPipeOther, realCmd);
+                    this->cmd_smash->addJob(this, pid, StoppedState, isRedPipeOther, realCmd,tOCmd);
                 }
                 front_pid = 0;
             } else {//this is smash pid backround
-                this->cmd_smash->addJob(this, pid, BgState, isRedPipeOther, realCmd);
                 if (isTimeOut) {
-                    if ((isRedPipeOther != OtherCmd) || realCmd != nullptr) {
-                        cmd_smash->addTimeOut(realCmd, pid, duration);
-                    } else
-                        cmd_smash->addTimeOut(this, pid, duration);
-                    alarm(duration);
+                    cmd_smash->addTimeOut(tOCmd, pid, duration);
+                    nextAlarm=alarm(duration);
+                    if(nextAlarm<duration&&nextAlarm!=0)
+                             alarm((nextAlarm));
                 }
+            this->cmd_smash->addJob(this, pid, BgState, isRedPipeOther, realCmd,tOCmd);
 
             }
         } else {//son
             front_pid = 0;
-            if (isRedPipeOther != PipCmd && !isTimeOut) //pipe dosent change pgrd
+            if (isRedPipeOther != PipCmd ) //pipe dosent change pgrd
                 setpgrp(); // we have to do it for the son
             execv(_args[0], _args);
             perror("smash error: execv failed");
@@ -920,8 +967,9 @@ void ExternalCommand::execute() {
 ///==========================================================================================
 ///   RedirectionCommand
 
-RedirectionCommand::RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst,bool isTimeOutConst= false, time_t durationConst=0)
-: Command(cmdLine,smash,isTimeOutConst,durationConst) {
+RedirectionCommand::RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst
+        ,bool isTimeOutConst= false, time_t durationConst=0,Command* tOCmdConst= nullptr)
+: Command(cmdLine,smash,isTimeOutConst,durationConst,tOCmdConst) {
     firstOption=isFirst;
 
 }
@@ -962,6 +1010,7 @@ void RedirectionCommand::execute() {
             perror("smash error: dup failed");
 
         }
+        fdScreen=fd1;//only for alarm use
 
         if (close(1) == FAIL) {
             perror("smash error: close failed");//closes stdout
@@ -987,7 +1036,7 @@ void RedirectionCommand::execute() {
         }
 
         try {
-            cmd_smash->executeCommand(charCmdLine1, RedCmd, this,isTimeOut,duration);//open file no matter
+            cmd_smash->executeCommand(charCmdLine1, RedCmd, this,isTimeOut,duration,tOCmd);//open file no matter
 
 
         }
@@ -1003,6 +1052,7 @@ void RedirectionCommand::execute() {
             perror("smash error: close failed");
         }
         int fd2 = dup2(fd1, 1); //stdout back to screen
+        fdScreen=-1;//only for alarm use
         if (fd2 == FAIL) {
             perror("smash error: dup2 failed");
 
@@ -1015,8 +1065,9 @@ void RedirectionCommand::execute() {
 ///==========================================================================================
 ///   RedirectionCommand
 
-PipeCommand::PipeCommand(const char *cmdLine,SmallShell& smash,bool isFirst,bool isTimeOutConst= false, time_t durationConst=0)
-: Command(cmdLine,smash,isTimeOutConst,durationConst) {
+PipeCommand::PipeCommand(const char *cmdLine,SmallShell& smash,bool isFirst
+        ,bool isTimeOutConst= false, time_t durationConst=0,Command* tOCmdConst= nullptr)
+: Command(cmdLine,smash,isTimeOutConst,durationConst,tOCmdConst) {
     firstOption = isFirst;
 }
 
@@ -1028,6 +1079,7 @@ void PipeCommand::execute() {
     string cmdLine2;
     int bufStart=0;
     int bufEnd=0;
+    time_t nextAlarm=0;
     bool isBack=_isBackgroundComamnd(fullCmd_line.c_str());
     _removeBackgroundSign((char*)fullCmd_line.c_str());
     if(firstOption){
@@ -1053,6 +1105,7 @@ void PipeCommand::execute() {
         perror("smash error: fork failed");
     if(p0==0) {//pipe process
         setpgrp();
+
         int fd[2];
         pipe(fd);
         pid_t p1 = fork();
@@ -1070,13 +1123,14 @@ void PipeCommand::execute() {
             }
             close(fd[0]);
             close(fd[1]);
-            cmd_smash->executeCommand(cmdLine1.c_str(), PipCmd,this,isTimeOut,duration);
+            cmd_smash->executeCommand(cmdLine1.c_str(), PipCmd,
+                    this,isTimeOut,duration,tOCmd);
+            //delete all??
             exit(0);
         } else{//pipe process
-            //wait(NULL);
-
-
+            close(fd[1]);//close stdout at pipe, makes cmd1 solo writer
             pid_t p2 = fork();
+
             if (p2 < 0) {//pid not good
                 perror("smash error: fork failed");
             }
@@ -1085,29 +1139,33 @@ void PipeCommand::execute() {
                 dup2(fd[0], 0);
                 close(fd[0]);
                 close(fd[1]);
-                cmd_smash->executeCommand(cmdLine2.c_str(), PipCmd, this,isTimeOut,duration);
-                //deleteall?
+                cmd_smash->executeCommand(cmdLine2.c_str(), PipCmd, this,isTimeOut,duration,tOCmd);
+                //delete all?
                 exit(0);
             }
             else { //pipe process
+                close(fd[0]);//close stdin at pipe, makes cmd2 solo reader
+                while(wait(NULL)!=FAIL);
+                /*
                 //wait(NULL);
                 front_pid = p1;
                 waitpid(p1, &status, WUNTRACED);///we should wait to output?
                 //if(WIFSTOPPED(status)){
-                // kill(SIGCONT,smash_pid);
+                //     kill(SIGCONT,smash_pid);
                 //  }
                 front_pid = 0;
                 front_pid = p2;
                 waitpid(p2, &status, WUNTRACED);///we should wait to output?
                 //if(WIFSTOPPED(status)){
-                //kill(SIGCONT,smash_pid);
+                //    kill(SIGCONT,smash_pid);
                 //}
                 front_pid = 0;
+                */
                 close(fd[0]);
                 close(fd[1]);
-
             }
         }
+        //delete all??
         exit(0);
     }
     else{
@@ -1115,20 +1173,24 @@ void PipeCommand::execute() {
         if(!isBack) {
             front_pid=p0;
             if(isTimeOut){
-                cmd_smash->addTimeOut(this,p0,duration);
-                alarm(duration);
+                cmd_smash->addTimeOut(tOCmd,p0,duration);
+                nextAlarm=alarm(duration);
+                if(nextAlarm<duration&&nextAlarm!=0)
+                    alarm((nextAlarm));
             }
             waitpid(p0, &status, WUNTRACED);
             if(WIFSTOPPED(status)){
-                this->cmd_smash->addJob(this,p0,StoppedState,PipCmd);
+                this->cmd_smash->addJob(this,p0,StoppedState,PipCmd,tOCmd);
             }
             front_pid = 0;
         }
         else {
-            this->cmd_smash->addJob(this, p0, BgState, PipCmd);//pipCmd
+            this->cmd_smash->addJob(this, p0, BgState, PipCmd,tOCmd);//pipCmd
             if(isTimeOut){
-                cmd_smash->addTimeOut(this,p0,duration);
-                alarm(duration);
+                cmd_smash->addTimeOut(tOCmd,p0,duration);
+                nextAlarm=alarm(duration);
+                if(nextAlarm<duration&&nextAlarm!=0)
+                    alarm((nextAlarm));
             }
         }
     }
@@ -1161,13 +1223,16 @@ bool isSamePath(string a, string b){
     return false;
 }
 
-CpCommand::CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst,Command* realCmdConst,bool isTimeOutConst,time_t durationConst)
+CpCommand::CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst,Command* realCmdConst
+        ,bool isTimeOutConst,time_t durationConst,Command* tOCmdConst)
 : BuiltInCommand(cmd_line,smash), run(run),isRedPipeOther(redPipConst),realCmd(realCmdConst){
     isTimeOut=isTimeOutConst;
     duration=durationConst;
+    tOCmd=tOCmdConst;
 }
 
 void CpCommand::execute() {
+    time_t nextAlarm=0;
     pid_t pid = fork();
     int status;
     //mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -1176,11 +1241,10 @@ void CpCommand::execute() {
         perror("smash error: fork failed");
     } else if (pid > 0) {
         if (isTimeOut) {
-            if ((isRedPipeOther != OtherCmd) || realCmd != nullptr) {
-                cmd_smash->addTimeOut(realCmd, pid, duration);
-            } else
-                cmd_smash->addTimeOut(this, pid, duration);
-            alarm(duration);
+            cmd_smash->addTimeOut(tOCmd, pid, duration);
+            nextAlarm=alarm(duration);
+            if(nextAlarm<duration&&nextAlarm!=0)
+                      alarm((nextAlarm));
         }
         if(isRedPipeOther==PipCmd)
             wait(NULL);
@@ -1188,14 +1252,15 @@ void CpCommand::execute() {
             front_pid = pid;
             waitpid(pid, &status, WUNTRACED);
             if (WIFSTOPPED(status)) {
-                this->cmd_smash->addJob(this, pid, StoppedState,isRedPipeOther,realCmd);
+                this->cmd_smash->addJob(this, pid, StoppedState,isRedPipeOther,realCmd,tOCmd);
             }
             front_pid = 0;
         } else {
-            this->cmd_smash->addJob(this, pid,BgState,isRedPipeOther,realCmd);
+            this->cmd_smash->addJob(this, pid,BgState,isRedPipeOther,realCmd,tOCmd);
         }
     } else {
-            setpgrp();
+            if (isRedPipeOther != PipCmd ) //pipe dosent change pgrd
+                setpgrp(); // we have to do it for the son
 
             if (this->num_of_arg != 3) {
                 ///invalid num of arg
@@ -1289,16 +1354,17 @@ void TimeOutCommand::execute() {
     string fullCmd_line = (string)cmd_line;
     string cmdLine1;
     int bufStart = 0;
-    string s="timeout "+to_string(duration)+SPACE;
-    bufStart = fullCmd_line.find(s);
+    //string s="timeout "+to_string(duration)+SPACE;
+    bufStart = fullCmd_line.find_first_of(to_string(duration));
 
-    cmdLine1 = fullCmd_line.substr(bufStart+s.size() );
+    cmdLine1 = fullCmd_line.substr(bufStart+to_string(duration).length() );
     cmdLine1=_trim(cmdLine1);
     int n1 = cmdLine1.length();
     char charCmdLine1[n1 + 1];
     strcpy(charCmdLine1, cmdLine1.c_str());
+    tOCmd=this;
 
-    cmd_smash->executeCommand(charCmdLine1,OtherCmd, nullptr,true,duration); //is TimeOut
+    cmd_smash->executeCommand(charCmdLine1,OtherCmd, nullptr,true,duration,tOCmd); //is TimeOut
 
 }
 
@@ -1367,7 +1433,7 @@ void TimeOutList::killAllTimeOut() {
 
 
 void TimeOutList::removeTimeOutById(unsigned int ToId) {
-    this->sortAndDelete();
+    this->sortOnly();
     if(tOVector.empty())
         return;
     int size = tOVector.size();
@@ -1404,7 +1470,7 @@ void TimeOutList::SetMaxTOid(unsigned int new_maxid) {
 
 
 unsigned int TimeOutList::GetPidByTOid(unsigned int tOid) {
-    this->removeFinishedTimeOut();
+    this->sortOnly();
     for (auto it = tOVector.begin(); it != tOVector.end(); ++it) {
         if (it->GetTimeOutId() == tOid) {
             return it->GetTimeOutPid();
@@ -1421,7 +1487,7 @@ TimeOutList::TimeOutEntry *TimeOutList::getTimeOutById(unsigned int tOId) {
     return nullptr;
 }
 unsigned int TimeOutList::GetPidFinishNow() {
-    this->removeFinishedTimeOut();
+    this->sortOnly();
     time_t currentTime;
     int secArea;
     currentTime=time(nullptr);
@@ -1434,7 +1500,7 @@ unsigned int TimeOutList::GetPidFinishNow() {
     return 0;
 }
 TimeOutList::TimeOutEntry*  TimeOutList::GetTOFinishNow(time_t now) {
-    this->removeFinishedTimeOut();
+    this->sortOnly();
     time_t secArea;
     time_t should_finish;
     time_t timeStep;
@@ -1447,25 +1513,15 @@ TimeOutList::TimeOutEntry*  TimeOutList::GetTOFinishNow(time_t now) {
     dur=tOVector[0].GetTimeOuDuration();
     should_finish=timeStep+dur;
     secArea=difftime(now,should_finish);
-    if (secArea>=-1&&secArea<=1) {
+    if (secArea>-1&&secArea<1) {
+    //if(secArea==0){
         return &(tOVector[0]);
     }
-    /*
-    for (auto it = tOVector.begin(); it != tOVector.end(); ++it) {
-        timeStep=it->GetTimeOutTimeStep();
-        dur=it->GetTimeOuDuration();
-        should_finish=timeStep +dur;
-        secArea=difftime(now,should_finish);
-        if (secArea>=-1&&secArea<=1) {
-            return &(*it);
-        }
-    }
-     */
     return nullptr;
 
 }
 void  TimeOutList::SetAlarmTONext(time_t now) {
-    this->sortAndDelete();
+    this->sortOnly();
     if(tOVector.empty())
         return;
     time_t should_finish=tOVector[0].GetTimeOutTimeStep()+tOVector[0].GetTimeOuDuration();
@@ -1492,7 +1548,7 @@ bool TimeOutList::TimeOutEntry::operator<(const TimeOutList::TimeOutEntry &timeO
     if(tOTimeStep+duration<timeOutEntry.tOTimeStep+timeOutEntry.duration)
         return true;
     if(tOTimeStep+duration>timeOutEntry.tOTimeStep+timeOutEntry.duration)
-        return true;
+        return false;
     return this->tOId<timeOutEntry.tOId;
 }
 
