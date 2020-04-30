@@ -38,8 +38,9 @@ class JobsList;
 class EmptyCommandException : public exception {};
 __pid_t getFrontPid ();
 __pid_t getSmashPid ();
-SmallShell* getSmashGlob();
-
+//SmallShell* getSmashGlob();
+int getFdScreen();
+bool is_pid_running(pid_t pid);
 ///==========================================================================================
 ///   Command
 class Command {
@@ -52,9 +53,11 @@ protected:
     unsigned int cmd_pid=0;
     bool isTimeOut;
     time_t duration;
+    Command* tOCmd;
 public:
     Command(const char* cmd_line);
-    Command(const char* cmd_line,SmallShell& smash,bool isTimeOut=false, time_t duration=0);
+    Command(const char* cmd_line,SmallShell& smash
+            ,bool isTimeOut=false, time_t duration=0,Command* tOCmd= nullptr);
     virtual ~Command();
     virtual void execute() = 0;
     //virtual void prepare();
@@ -68,8 +71,8 @@ public:
 ///   BuiltInCommand
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(const char *cmdLine);
-    BuiltInCommand(const char* cmd_line,SmallShell& smash);
+    BuiltInCommand(const char *cmdLine,bool isTimeOut= false,time_t duration=0,Command* tOCmd= nullptr);
+    BuiltInCommand(const char* cmd_line,SmallShell& smash,bool isTimeOut= false,time_t duration=0,Command* tOCmd= nullptr);
     virtual ~BuiltInCommand() {};
 };
 ///==========================================================================================
@@ -78,9 +81,10 @@ class ExternalCommand : public Command {
     Run run = Front;
     RedPipOther isRedPipeOther;
     Command* realCmd;
+
 public:
-    ExternalCommand(const char* cmd_line,SmallShell& smash,RedPipOther isRedPipe,Command* realCmd,bool isTimeOut,
-                    time_t duration);
+    ExternalCommand(const char* cmd_line,SmallShell& smash,RedPipOther isRedPipe,Command* realCmd
+            ,bool isTimeOut,time_t duration,Command* tOCmd);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -91,7 +95,8 @@ class PipeCommand : public Command {
     bool firstOption;//first | second |&
 public:
     PipeCommand(const char* cmd_line);
-    explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst,bool isTimeOut, time_t duration);
+    explicit PipeCommand(const char *cmdLine,SmallShell& smash, bool isFirst
+            ,bool isTimeOut, time_t duration,Command* tOCmd);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -102,7 +107,8 @@ class RedirectionCommand : public Command {
     bool firstOption;
 public:
     explicit RedirectionCommand(const char *cmdLine);
-    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst,bool isTimeOut, time_t duration);
+    explicit RedirectionCommand(const char *cmdLine,SmallShell& smash,bool isFirst
+            ,bool isTimeOut, time_t duration,Command* tOCmd);
 
     virtual ~RedirectionCommand() {}
     void execute() override;
@@ -115,8 +121,9 @@ public:
 class Chprompt : public BuiltInCommand {
     string prompt;
 public:
-    Chprompt( SmallShell* smash, const char* new_prompt = "smash>");
-    virtual ~Chprompt()= default;
+    Chprompt( SmallShell* smash, const char* new_prompt = "smash>"
+            ,bool isTimeout= false,time_t duration=0,Command* tOCmd= nullptr);
+    virtual ~Chprompt() {};
     void execute() override;
 
 };
@@ -127,8 +134,9 @@ class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
     char* last_pwd;
 public:
-    ChangeDirCommand(const char* cmd_line, SmallShell& smash);
-    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    ChangeDirCommand(const char* cmd_line, SmallShell& smash
+            ,bool isTimeout,time_t duration,Command* tOCmd);
+    //ChangeDirCommand(const char* cmd_line, char** plastPwd);
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
@@ -136,7 +144,8 @@ public:
 ///   Pwd
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(const char *cmdLine);
+    GetCurrDirCommand(const char *cmdLine
+            ,bool isTimeout,time_t duration,Command* tOCmd);
     virtual ~GetCurrDirCommand() {}
     void execute() override;
 };
@@ -144,7 +153,8 @@ public:
 ///   ShowPid
 class ShowPidCommand : public BuiltInCommand {
 public:
-  ShowPidCommand(const char* cmd_line):BuiltInCommand(cmd_line){};
+  ShowPidCommand(const char* cmd_line
+          ,bool isTimeout,time_t duration,Command* tOCmd);
   virtual ~ShowPidCommand() {};
   void execute() override;
 };
@@ -174,7 +184,7 @@ class CpCommand : public BuiltInCommand {
     Command* realCmd;
 public:
     CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr,
-            bool isTimeOut=false,time_t duration=0);
+            bool isTimeOut=false,time_t duration=0,Command* tOCmd= nullptr);
     virtual ~CpCommand() {};
     void execute() override;
 };
@@ -228,6 +238,7 @@ public:
         double GetJobElapsed();
         State  GetJobState();
         string  GetJobCmdLine();
+        Command*  GetJobCmd();
         void  zeroJobStart();
         void  SetJobState(State newState);
     };
@@ -239,7 +250,8 @@ public:
     JobsList(const JobsList& jobsList)= delete;
     void operator=(const JobsList& jobsList)= delete;
     ~JobsList()= default;
-    void addJob(Command* cmd,pid_t pid,State state,RedPipOther isRedPipeOthe,Command* realCmd);
+    void addJob(Command* cmd,pid_t pid,State state,RedPipOther isRedPipeOthe
+            ,Command* realCmd,Command* tOCmd);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -262,7 +274,8 @@ class JobsCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_jobsCommand;
 public:
-    JobsCommand(const char* cmd_line, JobsList* jobs);
+    JobsCommand(const char* cmd_line, JobsList* jobs
+            ,bool isTimeout,time_t duration,Command* tOCmd);
     virtual ~JobsCommand() {}
     void execute() override;
 };
@@ -287,13 +300,13 @@ public:
         TimeOutEntry(const TimeOutEntry& timeOutEntry)= default;
         bool operator<(const TimeOutEntry &timeOutEntry) const;
         friend ostream& operator<<( ostream& os,TimeOutEntry& to);
-        unsigned int GetTimeOutId();
+        const unsigned int GetTimeOutId();
         pid_t GetTimeOutPid();
-        time_t GetTimeOuDuration();
+        const time_t GetTimeOuDuration();
         double GetTimeOutElapsed();
         string  GetTimeOutCmdLine();
         void  zeroTimeOutStart();
-        time_t GetTimeOutTimeStep();
+        const time_t GetTimeOutTimeStep();
     };
     // TODO: Add your data members
     vector<TimeOutEntry> tOVector;
@@ -318,6 +331,7 @@ public:
     void SetMaxTOid(unsigned int new_maxid);
     unsigned int GetPidFinishNow();
     TimeOutEntry* GetTOFinishNow(time_t now);
+    void  SetAlarmTONext(time_t now);
 
 };
 ///==========================================================================================
@@ -334,12 +348,12 @@ public:
 ///==========================================================================================
 ///   Kill
 class KillCommand : public BuiltInCommand {
-    KillCommand(const char *cmd_line, JobsList& jobs);
     JobsList* jl;
     int jobID;
     int signal;
 public:
-    KillCommand(const char* cmd_line, JobsList* jobs);
+    KillCommand(const char* cmd_line, JobsList* jobs
+            ,bool isTimeout,time_t duration,Command* tOCmd);
     virtual ~KillCommand() {}
     void execute() override;
 };
@@ -349,7 +363,8 @@ class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_fgCommand;
 public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs);
+    ForegroundCommand(const char* cmd_line, JobsList* jobs,
+            bool isTimeOutConst,time_t durationConst);
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
@@ -359,7 +374,8 @@ class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     JobsList* jobsList_bgCommand;
 public:
-    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    BackgroundCommand(const char* cmd_line, JobsList* jobs,
+            bool isTimeOut,time_t duration);
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
@@ -393,7 +409,8 @@ private:
 public:
     const string getPrompt()const;
     void setPrompt(string new_prompt);
-    Command *CreateCommand(const char* cmd_line,RedPipOther redPipOther,Command* realCmd,bool isTimeOut, time_t duration);
+    Command *CreateCommand(const char* cmd_line,RedPipOther redPipOther,Command* realCmd
+            ,bool isTimeOut, time_t duration,Command* tOCmd);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton
@@ -405,11 +422,12 @@ public:
     ~SmallShell();
     void DeleteAll();
     void executeCommand(const char* cmd_line, RedPipOther redPipOther=OtherCmd,Command* realCmd= nullptr,bool isTimeOut= false,
-                        time_t duration=0);
+                        time_t duration=0,Command* tOcmd= nullptr);
     // TODO: add extra methods as needed
     string GetLastPwd();
     void setLastPwd( string dir);
-    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther,Command* realCmd);
+    void addJob(Command* cmd,pid_t pid, State state,RedPipOther redPipOther
+            ,Command* realCmd,Command* tOCmd);
     TimeOutList*& GetTimeOutList();
 
     void addTimeOut(Command *cmd, pid_t pid, time_t duration);
