@@ -12,7 +12,7 @@ void ctrlZHandler(int sig_num) {
     __pid_t front_pid = getFrontPid();
     if (front_pid!=0) {
         kill(getFrontPid()*(-1), SIGSTOP);
-        cout<<"smash: process "<< front_pid <<" was stoped"<<endl;
+        cout<<"smash: process "<< front_pid <<" was stopped"<<endl;
     }
 }
 
