@@ -243,8 +243,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line,RedPipOther redPipOther
     }
     else if (command_args[0]=="cp"){
         Run run = (_isBackgroundComamnd(cmd_line))? Back: Front;
-        return new CpCommand(built_in_cmd_line,*this, run,redPipOther,realCmd
-                ,isTimeOut,duration,tOCmd);
+
+        return new CpCommand(cmd_line, *this, run, redPipOther, realCmd
+                , isTimeOut, duration, tOCmd);
     }
     else if (command_args[0]=="timeout") {
         timeOutListSmash->sortAndDelete();
@@ -377,8 +378,8 @@ ChangeDirCommand::ChangeDirCommand(const char *cmdLine,SmallShell& smash
 void ChangeDirCommand::execute() {
     char* current_dir=get_current_dir_name();
     if(args.size() == 1){
-        //cmd_smash->setLastPwd(string(current_dir));
-        //free (current_dir);
+        cmd_smash->setLastPwd(string(current_dir));
+        free (current_dir);
         ///perror("smash error: chdir failed");
         return;
     }
@@ -422,7 +423,7 @@ Chprompt::Chprompt(SmallShell* s, const char *cmd_line
         BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst) {
     this->cmd_smash = s;
     if (this->num_of_arg==1)
-        this->prompt ="smash> ";
+        this->prompt ="smash>";
     else {
         this->prompt = string(args[1])+=">";
     }
@@ -471,7 +472,7 @@ KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
 
 void KillCommand::execute() {
     if (this->signal==0){
-        cerr<<"smash error: kill: invalid argument"<<endl;
+        cerr<<"smash error: kill: invalid arguments"<<endl;
         return;
     }
     int pid = this->jl->GetPidByJid(this->jobID);
@@ -560,7 +561,7 @@ unsigned int FgBgCheck(vector<string> args, JobsList* jobs, const char *s
 
     if(!isFg&&(job)->GetJobState()==BgState) {
 
-        cerr << "smash error: " << s << ": job-id " << jid << " dis already running in the background" << endl;
+        cerr << "smash error: " << s << ": job-id " << jid << " is already running in the background" << endl;
         throw FgBgException();
     }
 
@@ -915,6 +916,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line, SmallShell& smash,RedPipO
 void ExternalCommand::execute() {
     int status;
     time_t nextAlarm=0;
+
     char cmd[COMMAND_ARGS_MAX_LENGTH];
     strcpy(cmd, cmd_line.c_str());
     if (run == Back) _removeBackgroundSign(cmd);
@@ -957,8 +959,8 @@ void ExternalCommand::execute() {
                 setpgrp(); // we have to do it for the son
             execv(_args[0], _args);
             perror("smash error: execv failed");
-            cmd_smash->DeleteAll();//for valgrind not reachbale
-            exit(0);
+            //cmd_smash->DeleteAll();//for valgrind not reachbale
+            //exit(0);
 
         }
     }
@@ -1004,50 +1006,42 @@ void RedirectionCommand::execute() {
     strcpy(charCmdLine1, cmdLine1.c_str());
     strcpy(charCmdLine2, cmdLine2.c_str());
 
+    int fd;
+    // mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    mode_t mode = 0666;
+    char *filename = charCmdLine2;
+    if (firstOption) {
+        fd = open(filename, O_WRONLY | O_TRUNC| O_CREAT , mode);//stdout to file
+        if (fd == FAIL) {
+            perror("smash error: open failed");//closes stdout
+            return;
 
+        }
+
+    } else  {
+        fd = open(filename, O_WRONLY | O_APPEND| O_CREAT , mode);//stdout to file
+        if (fd == FAIL) {
+            perror("smash error: open failed");//closes stdout
+            return;
+
+        }
+    }
         int fd1 = dup(1);
         if (fd1 == FAIL) {
             perror("smash error: dup failed");
 
+
         }
         fdScreen=fd1;//only for alarm use
 
-        if (close(1) == FAIL) {
-            perror("smash error: close failed");//closes stdout
+        if (dup2(fd,1) == FAIL) {
+            perror("smash error: dup2 failed");//closes stdout
+
 
         }
-        int fd;
-       // mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-       mode_t mode = 0666;
-        char *filename = charCmdLine2;
-        if (firstOption) {
-            fd = open(filename, O_WRONLY | O_TRUNC| O_CREAT , mode);//stdout to file
-            if (fd == FAIL) {
-                perror("smash error: open failed");//closes stdout
-
-            }
-
-        } else  {
-            fd = open(filename, O_WRONLY | O_APPEND| O_CREAT , mode);//stdout to file
-            if (fd == FAIL) {
-                perror("smash error: open failed");//closes stdout
-
-            }
-        }
-
-        try {
             cmd_smash->executeCommand(charCmdLine1, RedCmd, this,isTimeOut,duration,tOCmd);//open file no matter
 
 
-        }
-        catch (SmallShellException &e) {
-            int checkDelete = remove(filename);//if the cmd is illigal delete file, but if it opend befor?
-            if (checkDelete == FAIL) {
-                close(fd);
-                dup2(fd1, 1);
-                perror("smash error: remove failed");//closes stdout
-            }
-        }
         if (close(fd) == FAIL) {
             perror("smash error: close failed");
         }
@@ -1224,11 +1218,13 @@ bool isSamePath(string a, string b){
 }
 
 CpCommand::CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst,Command* realCmdConst
-        ,bool isTimeOutConst,time_t durationConst,Command* tOCmdConst)
+        ,bool isTimeOutConst,time_t durationConst,Command* tOCmdConst )
 : BuiltInCommand(cmd_line,smash), run(run),isRedPipeOther(redPipConst),realCmd(realCmdConst){
     isTimeOut=isTimeOutConst;
     duration=durationConst;
     tOCmd=tOCmdConst;
+
+
 }
 
 void CpCommand::execute() {
@@ -1259,27 +1255,33 @@ void CpCommand::execute() {
             this->cmd_smash->addJob(this, pid,BgState,isRedPipeOther,realCmd,tOCmd);
         }
     } else {
+        vector<string> command_args;
+        char built_in_cmd_line[COMMAND_ARGS_MAX_LENGTH];
+        strcpy(built_in_cmd_line,this->GetCmd_line().c_str());
+        _removeBackgroundSign(built_in_cmd_line);
+        _parseCommandLine(built_in_cmd_line,command_args);
             if (isRedPipeOther != PipCmd ) //pipe dosent change pgrd
                 setpgrp(); // we have to do it for the son
 
-            if (this->num_of_arg != 3) {
+            if (command_args.size() != 3) {
                 ///invalid num of arg
-                cmd_smash->DeleteAll();
+                //cmd_smash->DeleteAll();
                 exit(0);
             }
-            src = open(args[1].c_str(), O_RDONLY);
+            src = open(command_args[1].c_str(), O_RDONLY);
             if (src == FAIL) {
                 perror("smash error: open failed");
-                cmd_smash->DeleteAll();
+                //cmd_smash->DeleteAll();
                 exit(0);
             }
-            if (!isSamePath(args[1], args[2])) {
-                dst = open(args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+
+            if (!isSamePath(command_args[1], command_args[2])) {
+                dst = open(command_args[2].c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
                 if (dst == FAIL) {
                     if (close(src) == FAIL)
                         perror("smash error: close failed");
                     perror("smash error: open failed");
-                    cmd_smash->DeleteAll();
+                    //cmd_smash->DeleteAll();
                     exit(0);
                 }
                 char buff[30];
@@ -1294,7 +1296,7 @@ void CpCommand::execute() {
                             perror("smash error: close failed");
                         }
                         perror("smash error: read failed");
-                        cmd_smash->DeleteAll();
+                        //cmd_smash->DeleteAll();
                         exit(0);
                     }
                     if (write(dst, (void *) buff, read_count) == FAIL) {
@@ -1305,7 +1307,7 @@ void CpCommand::execute() {
                             perror("smash error: close failed");
                         }
                         perror("smash error: read failed");
-                        cmd_smash->DeleteAll();
+                        //cmd_smash->DeleteAll();
                         exit(0);
                     }
                 }
@@ -1314,8 +1316,8 @@ void CpCommand::execute() {
             }
             if (close(src) == FAIL)
                     perror("smash error: close failed");
-            cout << "smash: " << args[1] << " was copied to " << args[2] << endl;
-            cmd_smash->DeleteAll();
+            cout << "smash: " << command_args[1] << " was copied to " << command_args[2] << endl;
+            //cmd_smash->DeleteAll();
             exit(0);
         }
 }
@@ -1526,10 +1528,10 @@ void  TimeOutList::SetAlarmTONext(time_t now) {
         return;
     time_t should_finish=tOVector[0].GetTimeOutTimeStep()+tOVector[0].GetTimeOuDuration();
     time_t from_now=should_finish-now;
-    if(from_now==0){
+    /*if(from_now==0){
         kill(smash_pid,SIGALRM);
         return;
-    }
+    }*/
 
     alarm(from_now);
 }

@@ -12,7 +12,7 @@ void ctrlZHandler(int sig_num) {
     __pid_t front_pid = getFrontPid();
     if (front_pid!=0) {
         kill(getFrontPid()*(-1), SIGSTOP);
-        cout<<"smash: process "<< front_pid <<" was stoped"<<endl;
+        cout<<"smash: process "<< front_pid <<" was stopped"<<endl;
     }
 }
 
@@ -30,6 +30,7 @@ void alarmHandler(int sig_num) {
     // TODO: Add your implementation
 
     //search for endTimeOut and destroy
+    bool alive= false;
     time_t currentTime;
     currentTime = time(nullptr);
     SmallShell& smashGlob = SmallShell::getInstance();
@@ -43,7 +44,9 @@ void alarmHandler(int sig_num) {
         int fdScreen=getFdScreen();
         pid_t pid = tOentry->GetTimeOutPid();
         if (getSmashPid() != pid) {
-            if(pid!=0&&is_pid_running(pid)) {
+            cout << "smash: got an alarm" << endl;
+            alive=is_pid_running(pid);
+            if(pid!=0&&alive) {
                 int check = kill(pid*(-1), SIGKILL);//pid=0 is a built in command
                 if(check==-1)
                     perror("smash error: kill failed");
@@ -55,8 +58,9 @@ void alarmHandler(int sig_num) {
                     perror("smash error: dup2 failed");
                 }
             }
-            cout << "smash: got an alarm" << endl;
-            cout << tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
+
+            if(alive)
+                cout <<"smash: "<< tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
             tOList->removeTimeOutById(tOentry->GetTimeOutId());
         }
 

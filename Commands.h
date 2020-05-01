@@ -182,9 +182,11 @@ class CpCommand : public BuiltInCommand {
     Run run;
     RedPipOther isRedPipeOther;
     Command* realCmd;
+
 public:
     CpCommand(const char* cmd_line, SmallShell& smash, Run run,RedPipOther redPipConst=OtherCmd,Command* realCmdConst= nullptr,
-            bool isTimeOut=false,time_t duration=0,Command* tOCmd= nullptr);
+            bool isTimeOut=false,time_t duration=0,Command* tOCmd= nullptr
+                    );
     virtual ~CpCommand() {};
     void execute() override;
 };
