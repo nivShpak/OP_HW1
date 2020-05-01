@@ -124,7 +124,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 ///==========================================================================================
 ///   Smash
-SmallShell::SmallShell() :prompt("smash>"){
+SmallShell::SmallShell() :prompt("smash> "){
 // TODO: add your implementation
    /// char* tmp_pwd= get_current_dir_name();
     lastPwdSmash = "";
@@ -271,7 +271,7 @@ void SmallShell::executeCommand(const char *cmd_line,RedPipOther redPipConst, Co
 }
 
 void SmallShell::setPrompt(string new_prompt) {
-    this->prompt=new_prompt;
+    this->prompt= new_prompt + " ";
 }
 
 
