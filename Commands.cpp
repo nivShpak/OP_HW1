@@ -451,7 +451,7 @@ void ShowPidCommand::execute(){
 KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
         ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
         BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst),jl(jobs){
-    this->signal=0;
+	this->signal=FAIL;
     if (this->num_of_arg==3) {
         if (args[1][0]=='-' /*& args[2][0]!='-'*/) {
             int id;
@@ -460,18 +460,25 @@ KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
                     id=0;
                 }
                 string id_s = to_string(id);
-            int signal = stoi(args[1].c_str() + 1);
-            string sig_string = to_string(signal);
-            if ((id_s == args[2]) & (sig_string == (args[1].c_str() + 1)) & (signal >= 1 )& (signal <= 31)) {
+            try {
+				this->signal = stoi(string(args[1].c_str()+1));
+			}
+			catch (...){
+				this->signal = FAIL;
+			}
+				string sig_string = to_string(signal);
+            if ((id_s == args[2]) & (sig_string == (args[1].c_str() + 1)) & (signal >= 0 )& (signal <= 31)) {
                 this->jobID = id;
                 this->signal = signal;
             }
-        }
+            else
+				this->signal=FAIL;
+		}
     }
 }
 
 void KillCommand::execute() {
-    if (this->signal==0){
+    if (this->signal==FAIL){
         cerr<<"smash error: kill: invalid arguments"<<endl;
         return;
     }
