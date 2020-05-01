@@ -899,10 +899,10 @@ ostream &operator<<(ostream &os, JobsList::JobEntry &je) {
     State je_State=je.GetJobState();
     string s;
     if(je_State==StoppedState){
-        s=" (stopped)\n";
+        s=" (stopped)";
     } else
-        s="\n";
-    os<<"["<<je.GetJobId()<<"]"<<SPACE<<je.GetJobCmdLine()<<" : "<<je.GetJobPid()<<SPACE<<je.GetJobElapsed()<<" secs"<<s;
+        s="";
+    os<<"["<<je.GetJobId()<<"]"<<SPACE<<je.GetJobCmdLine()<<" : "<<je.GetJobPid()<<SPACE<<je.GetJobElapsed()<<" secs"<<s<<endl;
     return os;
 }
 
@@ -1046,18 +1046,18 @@ void RedirectionCommand::execute() {
 
 
         }
-            cmd_smash->executeCommand(charCmdLine1, RedCmd, this,isTimeOut,duration,tOCmd);//open file no matter
-
-
-        if (close(fd) == FAIL) {
-            perror("smash error: close failed");
-        }
+        cmd_smash->executeCommand(charCmdLine1, RedCmd, this,isTimeOut,duration,tOCmd);//open file no matter
         int fd2 = dup2(fd1, 1); //stdout back to screen
         fdScreen=-1;//only for alarm use
         if (fd2 == FAIL) {
             perror("smash error: dup2 failed");
 
         }
+
+        if (close(fd) == FAIL||close(fd1)==FAIL) {
+            perror("smash error: close failed");
+        }
+
 
     
 }
