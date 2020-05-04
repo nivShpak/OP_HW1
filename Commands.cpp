@@ -346,7 +346,7 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line, SmallShell &smash
         ,bool isTimeOut,time_t duration,Command* tOCmd) : Command(cmd_line, smash){
     time_t nextAlarm;
     if(isTimeOut&&tOCmd!= nullptr){
-            smash_glob->addTimeOut(tOCmd, 0, duration);
+            //smash_glob->addTimeOut(tOCmd, 0, duration);
             nextAlarm=alarm(duration);
             if(nextAlarm<duration&&nextAlarm!=0)
                 alarm((nextAlarm));
@@ -451,7 +451,7 @@ void ShowPidCommand::execute(){
 KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
         ,bool isTimeOutConst=false,time_t durationConst=0,Command* tOCmdConst= nullptr) :
         BuiltInCommand(cmd_line,isTimeOutConst,durationConst,tOCmdConst),jl(jobs){
-	this->signal=FAIL;
+	//this->signal=FAIL;
     if (this->num_of_arg==3) {
         if (args[1][0]=='-' /*& args[2][0]!='-'*/) {
             int id;
@@ -464,21 +464,23 @@ KillCommand::KillCommand(const char* cmd_line, JobsList* jobs
 				this->signal = stoi(string(args[1].c_str()+1));
 			}
 			catch (...){
-				this->signal = FAIL;
+				valid= false;
 			}
 				string sig_string = to_string(signal);
-            if ((id_s == args[2]) & (sig_string == (args[1].c_str() + 1)) & (signal >= 0 )& (signal <= 31)) {
+            if ((id_s == args[2]) && (sig_string == (args[1].c_str() + 1))) {// && (signal >= 0 )&& (signal <= 31))
                 this->jobID = id;
-                this->signal = signal;
+                valid= true;
+                //this->signal = signal;
             }
             else
-				this->signal=FAIL;
+				//this->signal=FAIL;
+				valid= false;
 		}
     }
 }
 
 void KillCommand::execute() {
-    if (this->signal==FAIL){
+    if (!valid){//(this->signal==FAIL){
         cerr<<"smash error: kill: invalid arguments"<<endl;
         return;
     }
@@ -489,6 +491,7 @@ void KillCommand::execute() {
     }
     if (kill(pid*(-1),this->signal)!=0){
         perror("smash error: kill failed");
+        return;
         //cout<<"here2"<<endl;// its a a mistake?
     }
     cout<<"signal number "<< this->signal <<" was sent to pid "<< pid <<endl;

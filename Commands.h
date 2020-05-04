@@ -353,6 +353,7 @@ class KillCommand : public BuiltInCommand {
     JobsList* jl;
     int jobID;
     int signal;
+    bool valid=false;
 public:
     KillCommand(const char* cmd_line, JobsList* jobs
             ,bool isTimeout,time_t duration,Command* tOCmd);

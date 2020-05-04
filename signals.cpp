@@ -59,7 +59,7 @@ void alarmHandler(int sig_num) {
             }
         }
 
-        if(alive)
+        if(alive&&pid!=0)
             cout <<"smash: "<< tOentry->GetTimeOutCmdLine() << " timed out!" << endl;
         tOList->removeTimeOutById(tOentry->GetTimeOutId());
     }
